@@ -205,7 +205,7 @@ const ProductFilters = memo(({
 
   const contentClasses = isMobile
     ? 'fixed inset-y-0 right-0 w-full bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto'
-    : 'bg-white rounded-2xl shadow-sm sticky top-8 w-full h-full';
+    : 'bg-white rounded-2xl shadow-sm sticky top-4 w-full max-h-[calc(100vh-2rem)] overflow-y-auto';
 
   return (
     <>
@@ -296,25 +296,6 @@ const ProductFilters = memo(({
             icon="📂"
           >
             <div className="space-y-2" role="radiogroup" aria-label="Product categories">
-              <button
-                onClick={() => setSelectedCategory('')}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 touch-manipulation min-h-[48px] ${
-                  !selectedCategory
-                    ? 'bg-primary-600 text-white shadow-md'
-                    : 'hover:bg-gray-100 focus:bg-gray-100'
-                }`}
-                role="radio"
-                aria-checked={!selectedCategory}
-                onFocus={() => handleFocus('category-all')}
-                onBlur={handleBlur}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl" aria-hidden="true">🏪</span>
-                    <span className="font-medium">All Categories</span>
-                  </div>
-                </div>
-              </button>
               {categoriesWithCounts.map((category) => (
                 <button
                   key={category.id}

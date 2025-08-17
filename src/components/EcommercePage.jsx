@@ -26,6 +26,7 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
   const [selectedBrands, setSelectedBrands] = useState(searchParams.get('brands') ? searchParams.get('brands').split(',') : []);
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page')) || 1);
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // Store all products for category counts
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const retryCountRef = useRef(0);
@@ -54,6 +55,19 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
   const itemsPerPage = 9;
 
 
+
+  // Fetch all products for category counts (only once)
+  const fetchAllProducts = useCallback(async () => {
+    try {
+      const { data, error } = await getProducts(); // No filters to get all products
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch all products');
+      }
+      setAllProducts(data || []);
+    } catch (err) {
+      console.error('Error fetching all products:', err);
+    }
+  }, []);
 
   // Fetch products from Supabase with comprehensive error handling
   const fetchProducts = useCallback(async (filters = {}, isRetry = false) => {
@@ -89,8 +103,9 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
 
   // Initial load
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchAllProducts(); // Fetch all products for category counts
+    fetchProducts(); // Fetch filtered products for display
+  }, [fetchProducts, fetchAllProducts]);
 
   // Refetch when filters change
   useEffect(() => {
@@ -115,22 +130,22 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
     return uniqueBrands.sort();
   }, [products]);
 
-  // Update categories with actual product counts
+  // Update categories with actual product counts from ALL products
   const categoriesWithCounts = useMemo(() => {
-    const categoryCounts = (products || []).reduce((acc, product) => {
+    const categoryCounts = (allProducts || []).reduce((acc, product) => {
       acc[product.category] = (acc[product.category] || 0) + 1;
       return acc;
     }, {});
 
     return [
-      { id: 'all', name: 'All Products', icon: '🏪', count: (products || []).length },
+      { id: 'all', name: 'All Products', icon: '🏪', count: (allProducts || []).length },
       { id: 'food', name: 'Food', icon: '🍖', count: categoryCounts['food'] || 0 },
       { id: 'toys', name: 'Toys', icon: '🧸', count: categoryCounts['toys'] || 0 },
       { id: 'accessories', name: 'Accessories', icon: '🎾', count: categoryCounts['accessories'] || 0 },
       { id: 'health', name: 'Health', icon: '💊', count: categoryCounts['health'] || 0 },
       { id: 'grooming', name: 'Grooming', icon: '🧴', count: categoryCounts['grooming'] || 0 }
     ];
-  }, [products]);
+  }, [allProducts]);
 
   // Memoized pagination calculations
   const paginationData = useMemo(() => {
