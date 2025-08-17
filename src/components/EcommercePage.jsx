@@ -45,23 +45,6 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
         message: err.message || 'Failed to load products. Please check your connection and try again.',
         canRetry: retryCount < 3
       });
-      
-      // Implement retry logic
-      setRetryCount(prev => {
-        if (prev < 3) {
-          setTimeout(() => {
-            // Trigger refetch after delay without dependency loop
-            getProducts().then(data => {
-              setProducts(data);
-              setRetryCount(0);
-            }).catch(() => {
-              // If retry fails, increment count again
-              setRetryCount(p => p + 1);
-            });
-          }, 1000 * (prev + 1)); // Exponential backoff
-        }
-        return prev + 1;
-      });
     } finally {
       setLoading(false);
       // setIsRetrying(false); // Removed unused state
