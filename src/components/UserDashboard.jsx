@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { User, Package, Heart, Settings, LogOut, ShoppingBag, Calendar, Bell } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Package, Heart, Settings, LogOut, Calendar, CreditCard, MapPin, Phone, Mail, Edit2, Save, X } from 'lucide-react';
+import { formatPrice } from '../utils';
 import OrderHistory from './OrderHistory';
 
 const UserDashboard = ({ user, onLogout, onNavigateToEcommerce, onNavigateToBooking }) => {
@@ -31,13 +32,7 @@ const UserDashboard = ({ user, onLogout, onNavigateToEcommerce, onNavigateToBook
     }
   ]);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
+
 
   const removeFromWishlist = (productId) => {
     setWishlist(prev => prev.filter(item => item.id !== productId));

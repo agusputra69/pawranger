@@ -1,9 +1,11 @@
-import React, { useState, memo, useMemo, useCallback, useEffect } from 'react';
-import { ShoppingCart, Star, Heart, Filter, Search, Plus, Minus, Loader2 } from 'lucide-react';
+import React, { useState, memo, useMemo, useEffect } from 'react';
+import { ShoppingCart, Star, Heart, Filter, Search, Plus, Minus, Loader2, Grid, List, ChevronDown, X } from 'lucide-react';
 import { getProducts } from '../lib/supabase';
 import ProductSkeleton, { CategoryFilterSkeleton, SearchFilterSkeleton } from './ProductSkeleton';
+import { formatPrice } from '../utils';
+import { PRODUCT_CATEGORIES, SORT_OPTIONS, VIEW_MODES, PAGINATION } from '../constants';
 
-const Shop = ({ cartItems, addToCart, onOpenCart }) => {
+const Shop = memo(({ cartItems, addToCart, onOpenCart }) => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [wishlist, setWishlist] = useState([]);
@@ -11,13 +13,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const formatPrice = useCallback((price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  }, []);
+
 
   // Fetch products from Supabase
   useEffect(() => {
@@ -52,6 +48,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart }) => {
     { id: 'accessories', name: 'Aksesoris', icon: '🎾' }
   ];
 
+  // Memoized filtered and sorted products
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
@@ -74,7 +71,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart }) => {
 
 
   const getTotalCartItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
+    return (cartItems || []).reduce((total, item) => total + item.quantity, 0);
   };
 
   return (
@@ -413,6 +410,6 @@ const Shop = ({ cartItems, addToCart, onOpenCart }) => {
       </div>
     </section>
   );
-};
+});
 
-export default memo(Shop);
+export default Shop;

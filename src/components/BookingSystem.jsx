@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Calendar, Clock, User, Phone, Mail, MapPin, Check, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { Calendar, Clock, User, Phone, Mail, MapPin, PawPrint, Check, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { createBooking, supabase } from '../lib/supabase';
+import { formatPrice } from '../utils';
 
-const BookingSystem = ({ user, onLogin }) => {
+const BookingSystem = memo(({ user, onLogin }) => {
   const [selectedService, setSelectedService] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -130,13 +131,7 @@ const BookingSystem = ({ user, onLogin }) => {
     }
   }, [selectedDate]);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
+
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -168,11 +163,11 @@ const BookingSystem = ({ user, onLogin }) => {
     return date >= today && date.getDay() !== 0; // Not Sunday and not in the past
   };
 
-  const handleDateSelect = (date) => {
+  const handleDateSelect = useCallback((date) => {
     if (isDateAvailable(date)) {
       setSelectedDate(date);
     }
-  };
+  }, []);
 
   const validateField = (field, value) => {
     const errors = {};
@@ -241,7 +236,7 @@ const BookingSystem = ({ user, onLogin }) => {
     }
   };
 
-  const handleSubmitBooking = async () => {
+  const handleSubmitBooking = useCallback(async () => {
     if (!user) {
       setError('Please login to make a booking');
       if (onLogin) onLogin();
@@ -288,7 +283,7 @@ const BookingSystem = ({ user, onLogin }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [user, selectedService, selectedDate, selectedTime, bookingData, onLogin]);
 
   const resetBooking = () => {
     setSelectedService(null);
@@ -840,6 +835,6 @@ const BookingSystem = ({ user, onLogin }) => {
       </div>
     </div>
   );
-};
+});
 
 export default BookingSystem;

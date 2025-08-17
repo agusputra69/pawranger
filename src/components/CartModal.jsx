@@ -1,37 +1,72 @@
-import React, { memo, useMemo, useCallback } from 'react';
-import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
+import React, { useCallback, useMemo, memo } from 'react';
+import { X, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { formatPrice } from '../utils';
 
-const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onNavigateToEcommerce, onCheckout }) => {
+const CartModal = ({ 
+  isOpen, 
+  onClose, 
+  onCheckout, 
+  cartItems = [], 
+  updateQuantity, 
+  removeItem, 
+  onNavigateToEcommerce,
+  isLoading = false 
+}) => {
 
-  const formatPrice = useCallback((price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  }, []);
-
-  const totalPrice = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Memoized calculations to prevent unnecessary re-computations
+  const { totalPrice, totalItems } = useMemo(() => {
+    const price = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    return {
+      totalPrice: price,
+      totalItems: itemCount
+    };
   }, [cartItems]);
 
-  const totalItems = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  }, [cartItems]);
+  // Memoized event handlers
+  const handleQuantityUpdate = useCallback((itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeItem(itemId);
+    } else {
+      updateQuantity(itemId, newQuantity);
+    }
+  }, [updateQuantity, removeItem]);
 
-  // Memoized calculations are now defined above
+  const handleRemoveItem = useCallback((itemId) => {
+    removeItem(itemId);
+  }, [removeItem]);
 
-  const handleCheckout = () => {
-    if (cartItems.length === 0) return;
+  const handleCheckout = useCallback(() => {
     onCheckout();
-  };
-
-  const navigateToEcommerce = () => {
     onClose();
-    onNavigateToEcommerce();
-  };
+  }, [onCheckout, onClose]);
+
+  const navigateToEcommerce = useCallback(() => {
+    if (onNavigateToEcommerce) {
+      onNavigateToEcommerce();
+    } else {
+      onClose();
+    }
+  }, [onNavigateToEcommerce, onClose]);
 
   if (!isOpen) return null;
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden">
+        <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" />
+        <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading cart...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -110,7 +145,7 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
                           {/* Quantity Controls */}
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              onClick={() => handleQuantityUpdate(item.id, item.quantity - 1)}
                               className="w-8 h-8 rounded-full bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                             >
                               <Minus className="w-4 h-4" />
@@ -119,7 +154,7 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
                               {item.quantity}
                             </span>
                             <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              onClick={() => handleQuantityUpdate(item.id, item.quantity + 1)}
                               className="w-8 h-8 rounded-full bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                             >
                               <Plus className="w-4 h-4" />
@@ -133,10 +168,10 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
                             Subtotal: {formatPrice(item.price * item.quantity)}
                           </span>
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => handleRemoveItem(item.id)}
                             className="text-red-500 hover:text-red-700 transition-colors p-1"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       </div>

@@ -57,10 +57,10 @@ export const getProducts = async (filters = {}) => {
   }
 
   // Apply price range filter
-  if (filters.minPrice !== undefined) {
+  if (filters.minPrice !== undefined && filters.minPrice !== null) {
     query = query.gte('price', filters.minPrice)
   }
-  if (filters.maxPrice !== undefined) {
+  if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
     query = query.lte('price', filters.maxPrice)
   }
 
@@ -242,4 +242,195 @@ export const syncLocalCartToSupabase = async (localCartItems) => {
   }
   
   return { data: results, error: null }
+}
+
+// Admin Product Management Functions
+export const getAllProductsAdmin = async (filters = {}) => {
+  let query = supabase
+    .from('products')
+    .select('*')
+
+  // Apply category filter
+  if (filters.category && filters.category !== 'all') {
+    query = query.eq('category', filters.category)
+  }
+
+  // Apply active status filter
+  if (filters.status !== undefined) {
+    query = query.eq('is_active', filters.status)
+  }
+
+  // Apply search term filter
+  if (filters.searchTerm) {
+    query = query.or(`name.ilike.%${filters.searchTerm}%,description.ilike.%${filters.searchTerm}%,brand.ilike.%${filters.searchTerm}%,sku.ilike.%${filters.searchTerm}%`)
+  }
+
+  // Apply sorting
+  if (filters.sortBy) {
+    switch (filters.sortBy) {
+      case 'name':
+        query = query.order('name', { ascending: true })
+        break
+      case 'price-low':
+        query = query.order('price', { ascending: true })
+        break
+      case 'price-high':
+        query = query.order('price', { ascending: false })
+        break
+      case 'stock-low':
+        query = query.order('stock_quantity', { ascending: true })
+        break
+      case 'stock-high':
+        query = query.order('stock_quantity', { ascending: false })
+        break
+      case 'newest':
+        query = query.order('created_at', { ascending: false })
+        break
+      case 'oldest':
+        query = query.order('created_at', { ascending: true })
+        break
+      default:
+        query = query.order('created_at', { ascending: false })
+        break
+    }
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
+
+  const { data, error } = await query
+  return { data, error }
+}
+
+export const getProductByIdAdmin = async (productId) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single()
+  return { data, error }
+}
+
+export const createProduct = async (productData) => {
+  const { data, error } = await supabase
+    .from('products')
+    .insert([{
+      ...productData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateProduct = async (productId, productData) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      ...productData,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', productId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteProduct = async (productId) => {
+  const { data, error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', productId)
+    .select()
+  return { data, error }
+}
+
+export const toggleProductStatus = async (productId, isActive) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update({ 
+      is_active: isActive,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', productId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateProductStock = async (productId, stockQuantity) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update({ 
+      stock_quantity: stockQuantity,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', productId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getProductCategories = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('category')
+    .not('category', 'is', null)
+  
+  if (error) return { data: [], error }
+  
+  // Get unique categories
+  const categories = [...new Set(data.map(item => item.category))]
+  return { data: categories, error: null }
+}
+
+export const getProductBrands = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('brand')
+    .not('brand', 'is', null)
+  
+  if (error) return { data: [], error }
+  
+  // Get unique brands
+  const brands = [...new Set(data.map(item => item.brand))]
+  return { data: brands, error: null }
+}
+
+export const bulkUpdateProducts = async (productIds, updateData) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      ...updateData,
+      updated_at: new Date().toISOString()
+    })
+    .in('id', productIds)
+    .select()
+  return { data, error }
+}
+
+export const getProductStats = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, is_active, stock_quantity, category')
+  
+  if (error) return { data: null, error }
+  
+  const stats = {
+    total: data.length,
+    active: data.filter(p => p.is_active).length,
+    inactive: data.filter(p => !p.is_active).length,
+    lowStock: data.filter(p => p.stock_quantity <= 5).length,
+    outOfStock: data.filter(p => p.stock_quantity === 0).length,
+    byCategory: {}
+  }
+  
+  // Count by category
+  data.forEach(product => {
+    if (product.category) {
+      stats.byCategory[product.category] = (stats.byCategory[product.category] || 0) + 1
+    }
+  })
+  
+  return { data: stats, error: null }
 }

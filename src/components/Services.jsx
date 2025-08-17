@@ -1,14 +1,15 @@
-import React, { memo } from 'react';
-import { Scissors, ShoppingBag, Stethoscope, Home, Car, Heart } from 'lucide-react';
+import React, { useState, memo } from 'react';
+import { Clock, MapPin, Phone, Star, Calendar, Users, Heart, Shield, Scissors, ShoppingBag, Stethoscope, HomeIcon, Car } from 'lucide-react';
+import { SERVICE_PRICING } from '../constants';
 
-const Services = ({ onNavigateToBooking }) => {
+const Services = memo(({ onNavigateToBooking }) => {
   const services = [
     {
       icon: <Scissors className="w-8 h-8" />,
       title: "Pet Grooming",
       description: "Layanan grooming lengkap dengan peralatan modern dan groomer berpengalaman",
       features: ["Mandi & Blow Dry", "Potong Kuku", "Pembersihan Telinga", "Styling Bulu"],
-      price: "Mulai dari Rp 75.000",
+      price: SERVICE_PRICING.GROOMING_BASIC,
       popular: true
     },
     {
@@ -24,15 +25,15 @@ const Services = ({ onNavigateToBooking }) => {
       title: "Konsultasi Kesehatan",
       description: "Konsultasi dengan dokter hewan berpengalaman untuk kesehatan optimal",
       features: ["Pemeriksaan Rutin", "Vaksinasi", "Konsultasi Online", "Emergency Care"],
-      price: "Mulai dari Rp 100.000",
+      price: SERVICE_PRICING.GROOMING_PREMIUM,
       popular: false
     },
     {
-      icon: <Home className="w-8 h-8" />,
+      icon: <HomeIcon className="w-8 h-8" />,
       title: "Pet Hotel",
       description: "Tempat penitipan yang aman dan nyaman dengan fasilitas lengkap",
       features: ["Kamar AC", "Area Bermain", "Makanan Teratur", "CCTV 24 Jam"],
-      price: "Mulai dari Rp 50.000/hari",
+      price: SERVICE_PRICING.BOARDING,
       popular: false
     },
     {
@@ -40,7 +41,7 @@ const Services = ({ onNavigateToBooking }) => {
       title: "Antar Jemput",
       description: "Layanan antar jemput untuk kemudahan dan kenyamanan Anda",
       features: ["Mobil Ber-AC", "Kandang Aman", "Area Jakarta", "Jadwal Fleksibel"],
-      price: "Mulai dari Rp 25.000",
+      price: SERVICE_PRICING.PICKUP_DELIVERY,
       popular: false
     },
     {
@@ -48,7 +49,7 @@ const Services = ({ onNavigateToBooking }) => {
       title: "Spa Treatment",
       description: "Perawatan spa khusus untuk relaksasi dan kesehatan kulit hewan",
       features: ["Aromaterapi", "Massage", "Masker Alami", "Perawatan Kulit"],
-      price: "Mulai dari Rp 150.000",
+      price: SERVICE_PRICING.SPA_TREATMENT,
       popular: false
     }
   ];
@@ -154,6 +155,6 @@ const Services = ({ onNavigateToBooking }) => {
       </div>
     </section>
   );
-};
+});
 
-export default memo(Services);
+export default Services;

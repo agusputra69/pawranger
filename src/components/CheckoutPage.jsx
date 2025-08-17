@@ -1,7 +1,11 @@
-import { useState } from 'react';
-import { ArrowLeft, Upload, Check, Clock, CreditCard, User, MapPin, Phone, Mail } from 'lucide-react';
-import { supabase, createOrder, clearCart } from '../lib/supabase';
-const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
+import React, { useState, useCallback, memo, useMemo } from 'react';
+import { ArrowLeft, CreditCard, MapPin, User, Phone, Mail, Upload, CheckCircle } from 'lucide-react';
+import { useCart } from '../hooks/useCart';
+import { createOrder, clearCart, supabase } from '../lib/supabase';
+import { formatPrice } from '../utils';
+import { ORDER_CONFIG } from '../constants';
+const CheckoutPage = memo(({ onBack, onOrderComplete, user }) => {
+  const { items: cartItems } = useCart();
   const [currentStep, setCurrentStep] = useState(1);
   const [orderData, setOrderData] = useState({
     customerInfo: {
@@ -42,19 +46,15 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
     }
   ];
 
-  const calculateTotal = () => {
+  const orderSummary = useMemo(() => {
     const subtotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
     const shipping = 25000; // Fixed shipping cost
     return { subtotal, shipping, total: subtotal + shipping };
-  };
+  }, [cartItems]);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
+  const calculateTotal = useCallback(() => orderSummary, [orderSummary]);
+
+
 
   const handleInputChange = (field, value) => {
     setOrderData(prev => ({
@@ -76,7 +76,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
     }
   };
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const errors = {};
     
     if (!orderData.customerInfo.name.trim()) errors.name = 'Name is required';
@@ -89,9 +89,9 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [orderData.customerInfo]);
 
-  const handleSubmitOrder = async () => {
+  const handleSubmitOrder = useCallback(async () => {
     if (!validateForm()) {
       setError('Please fill in all required fields correctly');
       return;
@@ -102,7 +102,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
     
     try {
       // Generate order number
-      const orderNumber = 'PWR' + Date.now();
+      const orderNumber = ORDER_CONFIG.orderPrefix + Date.now();
       
       // Calculate totals
       const { subtotal, shipping, total } = calculateTotal();
@@ -193,7 +193,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [orderData, cartItems, user, onOrderComplete, calculateTotal, validateForm]);
 
   const retryOrder = () => {
     setError(null);
@@ -623,6 +623,6 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
       </div>
     </div>
   );
-};
+});
 
 export default CheckoutPage;

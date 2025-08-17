@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { Star, Heart, ShoppingCart } from 'lucide-react';
 
 const ProductCard = memo(({ 
@@ -8,6 +8,14 @@ const ProductCard = memo(({
   onAddToCart, 
   formatPrice 
 }) => {
+  // Memoized event handlers to prevent unnecessary re-renders
+  const handleToggleWishlist = useCallback(() => {
+    onToggleWishlist(product.id);
+  }, [onToggleWishlist, product.id]);
+
+  const handleAddToCart = useCallback(() => {
+    onAddToCart(product);
+  }, [onAddToCart, product]);
   return (
     <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group transform hover:-translate-y-2">
       {/* Product Image & Discount Badge */}
@@ -24,7 +32,7 @@ const ProductCard = memo(({
         
         {/* Wishlist Button */}
         <button
-          onClick={() => onToggleWishlist(product.id)}
+          onClick={handleToggleWishlist}
           className={`absolute top-2 right-2 p-2 rounded-full transition-all duration-300 ${
             isWishlisted
               ? 'bg-red-500 text-white'
@@ -91,7 +99,7 @@ const ProductCard = memo(({
         
         {/* Add to Cart Button */}
         <button
-          onClick={() => onAddToCart(product)}
+          onClick={handleAddToCart}
           className="w-full bg-primary-600 text-white py-3 rounded-full hover:bg-primary-700 transition-all duration-300 flex items-center justify-center space-x-2 transform hover:scale-105"
         >
           <ShoppingCart className="w-5 h-5" />

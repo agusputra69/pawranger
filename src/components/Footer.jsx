@@ -1,4 +1,5 @@
 import { Heart, Phone, Mail, MapPin, Clock, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
+import { APP_CONFIG } from '../constants';
 
 const Footer = () => {
   const quickLinks = [
@@ -36,11 +37,11 @@ const Footer = () => {
     },
     {
       icon: <MapPin className="w-5 h-5" />,
-      text: 'Jl. Kemang Raya No. 123, Jakarta Selatan'
+      text: APP_CONFIG.contact.address
     },
     {
       icon: <Clock className="w-5 h-5" />,
-      text: 'Senin - Minggu: 08:00 - 20:00'
+      text: `Senin - Minggu: ${APP_CONFIG.contact.hours}`
     }
   ];
 

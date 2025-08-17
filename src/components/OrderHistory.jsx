@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Package, Clock, CheckCircle, XCircle, Eye, Truck, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, Clock, CheckCircle, XCircle, Eye, Download, Truck } from 'lucide-react';
 import { getUserOrders } from '../lib/supabase';
+import { formatPrice } from '../utils';
 
 const OrderHistory = ({ user }) => {
   const [orders, setOrders] = useState([]);
@@ -100,13 +101,7 @@ const OrderHistory = ({ user }) => {
     }
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
+
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {

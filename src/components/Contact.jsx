@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, MessageCircle, Calendar, User } from 'lucide-react';
+import { APP_CONFIG } from '../constants';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -132,13 +133,13 @@ const Contact = () => {
     {
       icon: <MapPin className="w-6 h-6" />,
       title: "Alamat",
-      details: ["Jl. Kemang Raya No. 123", "Jakarta Selatan 12560"],
+      details: [APP_CONFIG.contact.address.split(', ')[0], APP_CONFIG.contact.address.split(', ')[1]],
       action: "Lihat Peta"
     },
     {
       icon: <Clock className="w-6 h-6" />,
       title: "Jam Operasional",
-      details: ["Senin - Minggu: 08:00 - 20:00", "Emergency: 24/7"],
+      details: [`Senin - Minggu: ${APP_CONFIG.contact.hours}`, `Emergency: ${APP_CONFIG.contact.emergencyHours}`],
       action: "Booking Online"
     }
   ];
@@ -439,7 +440,7 @@ const Contact = () => {
               <div className="text-center">
                 <MapPin className="w-16 h-16 text-primary-600 mx-auto mb-4" />
                 <p className="text-lg font-semibold text-gray-800">Pawranger Pet Care</p>
-                <p className="text-gray-600">Jl. Kemang Raya No. 123, Jakarta Selatan</p>
+                <p className="text-gray-600">{APP_CONFIG.contact.address}</p>
                 <button className="mt-4 bg-primary-600 text-white px-6 py-2 rounded-full hover:bg-primary-700 transition-colors">
                   Buka di Google Maps
                 </button>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShoppingBag, Heart, Star, Truck, Shield, Award, ArrowRight, CheckCircle } from 'lucide-react';
+import { ORDER_CONFIG } from '../constants';
 
 const PetFoodLanding = ({ onNavigateToEcommerce }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -22,7 +23,7 @@ const PetFoodLanding = ({ onNavigateToEcommerce }) => {
     {
       icon: <Truck className="w-8 h-8" />,
       title: 'Pengiriman Cepat',
-      description: 'Gratis ongkir untuk pembelian di atas Rp 200.000 ke seluruh Indonesia'
+      description: `Gratis ongkir untuk pembelian di atas Rp ${ORDER_CONFIG.freeShippingThreshold.toLocaleString('id-ID')} ke seluruh Indonesia`
     },
     {
       icon: <Award className="w-8 h-8" />,

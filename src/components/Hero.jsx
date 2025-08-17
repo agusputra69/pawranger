@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { ArrowRight, Star, Users, Award, Heart } from 'lucide-react';
+import { BUSINESS_INFO } from '../constants';
 
 const Hero = ({ onNavigateToBooking }) => {
   return (
@@ -19,7 +20,7 @@ const Hero = ({ onNavigateToBooking }) => {
             <div className="space-y-4">
               <div className="inline-flex items-center bg-primary-100 text-primary-800 px-4 py-2 rounded-full text-sm font-medium">
                 <Star className="w-4 h-4 mr-2 fill-current" />
-                #1 Pet Care di Jakarta
+                {BUSINESS_INFO.tagline}
               </div>
               
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
