@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getProducts } from '../lib/supabase';
 import { ArrowLeft, ShoppingCart, HomeIcon } from 'lucide-react';
 import ProductFilters from './ecommerce/ProductFilters';
@@ -11,19 +12,43 @@ import MobileFilterSheet from './ecommerce/MobileFilterSheet';
 import MobileFilterButton from './ecommerce/MobileFilterButton';
 
 const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [wishlist, setWishlist] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
-  const [sortBy, setSortBy] = useState('popular');
-  const [priceRange, setPriceRange] = useState([0, 1000000]);
-  const [selectedBrands, setSelectedBrands] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'popular');
+  const [priceRange, setPriceRange] = useState([
+    parseInt(searchParams.get('minPrice')) || 0,
+    parseInt(searchParams.get('maxPrice')) || 1000000
+  ]);
+  const [selectedBrands, setSelectedBrands] = useState(searchParams.get('brands') ? searchParams.get('brands').split(',') : []);
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page')) || 1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
+
+  // Update URL parameters when filters change
+  const updateURLParams = useCallback((updates) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '' || 
+          (Array.isArray(value) && value.length === 0) ||
+          (key === 'category' && value === 'all') ||
+          (key === 'page' && value === 1)) {
+        newParams.delete(key);
+      } else if (Array.isArray(value)) {
+        newParams.set(key, value.join(','));
+      } else {
+        newParams.set(key, value.toString());
+      }
+    });
+    
+    setSearchParams(newParams);
+  }, [searchParams, setSearchParams]);
   // const [isRetrying, setIsRetrying] = useState(false); // Removed unused state
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const itemsPerPage = 9;
@@ -40,24 +65,27 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
       }
       setError(null);
       
+      console.log('Fetching products with filters:', filters);
       const { data, error } = await getProducts(filters);
       if (error) {
         throw new Error(error.message || 'Failed to fetch products');
       }
       
+      console.log('Products fetched successfully:', data?.length || 0, 'products');
       setProducts(data || []);
-      setRetryCount(0); // Reset retry count on success
+      retryCountRef.current = 0; // Reset retry count on success
     } catch (err) {
       console.error('Error fetching products:', err);
       setError({
         message: err.message || 'Failed to load products. Please check your connection and try again.',
-        canRetry: retryCount < 3
+        canRetry: retryCountRef.current < 3
       });
+      retryCountRef.current += 1;
     } finally {
       setLoading(false);
       // setIsRetrying(false); // Removed unused state
     }
-  }, [retryCount]);
+  }, []);
 
   // Retry function with exponential backoff (commented out as unused)
   // const retryFetchProducts = async () => {
@@ -116,12 +144,11 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
 
     return [
       { id: 'all', name: 'All Products', icon: '🏪', count: (products || []).length },
-      { id: 'dog-food', name: 'Dog Food', icon: '🐕', count: categoryCounts['dog-food'] || 0 },
-      { id: 'cat-food', name: 'Cat Food', icon: '🐱', count: categoryCounts['cat-food'] || 0 },
-      { id: 'accessories', name: 'Accessories', icon: '🎾', count: categoryCounts['accessories'] || 0 },
+      { id: 'food', name: 'Food', icon: '🍖', count: categoryCounts['food'] || 0 },
       { id: 'toys', name: 'Toys', icon: '🧸', count: categoryCounts['toys'] || 0 },
-      { id: 'treats', name: 'Treats', icon: '🦴', count: categoryCounts['treats'] || 0 },
-      { id: 'supplements', name: 'Health', icon: '💊', count: categoryCounts['supplements'] || 0 }
+      { id: 'accessories', name: 'Accessories', icon: '🎾', count: categoryCounts['accessories'] || 0 },
+      { id: 'health', name: 'Health', icon: '💊', count: categoryCounts['health'] || 0 },
+      { id: 'grooming', name: 'Grooming', icon: '🧴', count: categoryCounts['grooming'] || 0 }
     ];
   }, [products]);
 
@@ -165,6 +192,12 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
   };
 
   // Memoized event handlers to prevent unnecessary re-renders
+  // Handle page change with URL parameter updates
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    updateURLParams({ page });
+  }, [updateURLParams]);
+
   const handleAddToCart = useCallback((product) => {
     addToCart({
       id: product.id,
@@ -178,31 +211,36 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
   const handleCategoryChange = useCallback((category) => {
     setSelectedCategory(category);
     setCurrentPage(1);
-  }, []);
+    updateURLParams({ category: category, page: 1 });
+  }, [updateURLParams]);
 
   const handleBrandToggle = useCallback((brand) => {
-    setSelectedBrands(prev => 
-      prev.includes(brand) 
+    setSelectedBrands(prev => {
+      const newBrands = prev.includes(brand)
         ? prev.filter(b => b !== brand)
-        : [...prev, brand]
-    );
+        : [...prev, brand];
+      updateURLParams({ brands: newBrands, page: 1 });
+      return newBrands;
+    });
     setCurrentPage(1);
-  }, []);
+  }, [updateURLParams]);
 
   const handleSortChange = useCallback((sort) => {
     setSortBy(sort);
-    setCurrentPage(1);
-  }, []);
+    updateURLParams({ sort });
+  }, [updateURLParams]);
 
   const handleSearchChange = useCallback((term) => {
     setSearchTerm(term);
     setCurrentPage(1);
-  }, []);
+    updateURLParams({ search: term, page: 1 });
+  }, [updateURLParams]);
 
   const handlePriceRangeChange = useCallback((range) => {
     setPriceRange(range);
     setCurrentPage(1);
-  }, []);
+    updateURLParams({ minPrice: range[0], maxPrice: range[1], page: 1 });
+  }, [updateURLParams]);
 
   // Mobile filter handlers
   const handleOpenMobileFilter = useCallback(() => {
@@ -366,7 +404,7 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    setCurrentPage={setCurrentPage}
+                    setCurrentPage={handlePageChange}
                   />
                 )}
               </>

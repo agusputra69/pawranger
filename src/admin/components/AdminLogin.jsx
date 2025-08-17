@@ -161,7 +161,7 @@ const AdminLogin = () => {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-slate-400 text-sm">
-            &copy; 2024 PawRanger. All rights reserved.
+            &copy; 2025 PawRanger. All rights reserved.
           </p>
         </div>
       </div>

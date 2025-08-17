@@ -181,7 +181,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="text-center md:text-left mb-4 md:mb-0">
               <p className="text-gray-400 text-sm">
-                © 2024 Pawranger Pet Care. All rights reserved.
+                © 2025 Pawranger Pet Care. All rights reserved.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-end space-x-6 text-sm">
@@ -203,9 +203,8 @@ const Footer = () => {
           {/* Made with Love */}
           <div className="text-center mt-6 pt-6 border-t border-gray-800">
             <p className="text-gray-500 text-sm flex items-center justify-center">
-              Made with 
-              <Heart className="w-4 h-4 text-red-500 mx-1" /> 
-              for pets and their humans
+              Created by Gustra with 🩸
+              {/* <Heart className="w-4 h-4 text-red-500 mx-1" />  */}
             </p>
           </div>
         </div>

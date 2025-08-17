@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { validateAdminCredentials, getAuthErrorMessage } from '../utils/adminSetup';
 
 // Create Admin Context
 const AdminContext = createContext();
@@ -92,52 +93,57 @@ export const AdminProvider = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
 
-      // First, check if admin exists and is active
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
-
-      if (adminError || !adminData) {
-        throw new Error('Invalid admin credentials');
+      // Validate credentials format
+      const validation = validateAdminCredentials(email, password);
+      if (!validation.isValid) {
+        throw new Error(validation.errors.join('. '));
       }
 
-      // For now, we'll use a simple password check (in production, use proper hashing)
-      // This is a placeholder - you should implement proper password hashing
-      if (password !== 'admin123') {
-        throw new Error('Invalid admin credentials');
-      }
-
-      // Create a session for the admin user
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
+      // First, authenticate with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
         password: password
       });
 
       if (authError) {
-        // If auth fails, try to sign up the admin user
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: password
-        });
+        throw authError;
+      }
 
-        if (signUpError) {
-          throw signUpError;
-        }
+      if (!authData.user) {
+        throw new Error('Authentication failed');
+      }
+
+      // Check if the authenticated user is an admin
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email.trim())
+        .eq('is_active', true)
+        .single();
+
+      if (adminError || !adminData) {
+        // Sign out the user since they're not an admin
+        await supabase.auth.signOut();
+        throw new Error('Invalid admin credentials');
       }
 
       dispatch({ type: 'SET_ADMIN', payload: adminData });
       
+      // Update last login
+      await supabase
+        .from('admin_users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', adminData.id);
+      
       // Log admin activity
-      await logAdminActivity(adminData.id, 'login', 'auth', null, { email });
+      await logAdminActivity(adminData.id, 'login', 'auth', null, { email: email.trim() });
       
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message });
-      return { success: false, error: error.message };
+      const friendlyMessage = getAuthErrorMessage(error);
+      dispatch({ type: 'SET_ERROR', payload: friendlyMessage });
+      return { success: false, error: friendlyMessage };
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
