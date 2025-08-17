@@ -1,162 +1,142 @@
-import { useState, useEffect } from 'react';
-import { ShoppingCart, Star, Heart, Filter, Search, Grid, List, SlidersHorizontal, ArrowUpDown, ChevronDown, X, MapPin, Truck, Shield, Award, ArrowLeft, Home } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, Filter, Grid, List, Star, Heart, ShoppingCart, X, ArrowLeft, Home } from 'lucide-react';
+import { getProducts } from '../lib/supabase';
+import ProductSkeleton, { SearchFilterSkeleton } from './ProductSkeleton';
 
-const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onCheckout, user }) => {
+const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => {
+  
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [wishlist, setWishlist] = useState([]);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('popular');
   const [priceRange, setPriceRange] = useState([0, 1000000]);
   const [selectedBrands, setSelectedBrands] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  // const [isRetrying, setIsRetrying] = useState(false); // Removed unused state
+  const itemsPerPage = 9;
 
-  const categories = [
-    { id: 'all', name: 'Semua Produk', icon: '🛍️', count: 156 },
-    { id: 'dog-food', name: 'Makanan Anjing', icon: '🐕', count: 45 },
-    { id: 'cat-food', name: 'Makanan Kucing', icon: '🐱', count: 38 },
-    { id: 'treats', name: 'Snack & Treats', icon: '🦴', count: 28 },
-    { id: 'supplements', name: 'Vitamin & Suplemen', icon: '💊', count: 22 },
-    { id: 'accessories', name: 'Aksesoris', icon: '🎾', count: 23 }
-  ];
 
-  const brands = ['Royal Canin', 'Whiskas', 'Pedigree', 'Pro Plan', 'Felix', 'Pet Health', 'Hills', 'Eukanuba'];
 
-  const products = [
-    {
-      id: 1,
-      name: 'Royal Canin Adult Dog Food Premium',
-      category: 'dog-food',
-      price: 285000,
-      originalPrice: 320000,
-      rating: 4.8,
-      reviews: 156,
-      image: '🐕',
-      description: 'Makanan anjing dewasa dengan nutrisi seimbang untuk kesehatan optimal',
-      weight: '3kg',
-      brand: 'Royal Canin',
-      inStock: true,
-      discount: 11,
-      tags: ['Premium', 'Adult', 'Balanced Nutrition'],
-      features: ['High Protein', 'Omega 3 & 6', 'Digestive Health']
-    },
-    {
-      id: 2,
-      name: 'Whiskas Adult Cat Food Tuna & Salmon',
-      category: 'cat-food',
-      price: 45000,
-      originalPrice: 52000,
-      rating: 4.6,
-      reviews: 89,
-      image: '🐱',
-      description: 'Makanan kucing dewasa rasa tuna dan salmon dengan vitamin lengkap',
-      weight: '1.2kg',
-      brand: 'Whiskas',
-      inStock: true,
-      discount: 13,
-      tags: ['Tuna', 'Salmon', 'Adult'],
-      features: ['Complete Nutrition', 'Healthy Coat', 'Strong Bones']
-    },
-    {
-      id: 3,
-      name: 'Pedigree Dentastix Daily Oral Care',
-      category: 'treats',
-      price: 35000,
-      originalPrice: 40000,
-      rating: 4.7,
-      reviews: 234,
-      image: '🦴',
-      description: 'Snack pembersih gigi untuk anjing dengan formula khusus',
-      weight: '180g',
-      brand: 'Pedigree',
-      inStock: true,
-      discount: 12,
-      tags: ['Dental Care', 'Daily Treat', 'Healthy Teeth'],
-      features: ['Reduces Tartar', 'Fresh Breath', 'Daily Use']
-    },
-    {
-      id: 4,
-      name: 'Pro Plan Puppy Food with DHA',
-      category: 'dog-food',
-      price: 195000,
-      originalPrice: 220000,
-      rating: 4.9,
-      reviews: 78,
-      image: '🐶',
-      description: 'Makanan anak anjing dengan DHA untuk perkembangan otak optimal',
-      weight: '2.5kg',
-      brand: 'Pro Plan',
-      inStock: true,
-      discount: 11,
-      tags: ['Puppy', 'DHA', 'Brain Development'],
-      features: ['DHA for Brain', 'High Quality Protein', 'Immune Support']
-    },
-    {
-      id: 5,
-      name: 'Felix Cat Treats Chicken & Liver',
-      category: 'treats',
-      price: 25000,
-      originalPrice: 28000,
-      rating: 4.5,
-      reviews: 145,
-      image: '🐾',
-      description: 'Snack kucing rasa ayam dan hati yang lezat dan bergizi',
-      weight: '60g',
-      brand: 'Felix',
-      inStock: false,
-      discount: 10,
-      tags: ['Chicken', 'Liver', 'Tasty'],
-      features: ['Real Meat', 'No Artificial Colors', 'Irresistible Taste']
-    },
-    {
-      id: 6,
-      name: 'Pet Health Multivitamin Plus',
-      category: 'supplements',
-      price: 125000,
-      originalPrice: 145000,
-      rating: 4.4,
-      reviews: 67,
-      image: '💊',
-      description: 'Multivitamin lengkap untuk kesehatan hewan peliharaan',
-      weight: '100 tablet',
-      brand: 'Pet Health',
-      inStock: true,
-      discount: 14,
-      tags: ['Multivitamin', 'Health Support', 'Daily Supplement'],
-      features: ['Complete Vitamins', 'Immune Boost', 'Energy Support']
+  // Fetch products from Supabase with comprehensive error handling
+  const fetchProducts = useCallback(async (filters = {}, isRetry = false) => {
+    try {
+      if (isRetry) {
+        // setIsRetrying(true); // Removed unused state
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      
+      const { data, error } = await getProducts(filters);
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch products');
+      }
+      
+      setProducts(data || []);
+      setRetryCount(0); // Reset retry count on success
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError({
+        message: err.message || 'Failed to load products. Please check your connection and try again.',
+        canRetry: retryCount < 3
+      });
+      
+      // Implement retry logic
+      setRetryCount(prev => {
+        if (prev < 3) {
+          setTimeout(() => {
+            // Trigger refetch after delay without dependency loop
+            getProducts().then(data => {
+              setProducts(data);
+              setRetryCount(0);
+            }).catch(() => {
+              // If retry fails, increment count again
+              setRetryCount(p => p + 1);
+            });
+          }, 1000 * (prev + 1)); // Exponential backoff
+        }
+        return prev + 1;
+      });
+    } finally {
+      setLoading(false);
+      // setIsRetrying(false); // Removed unused state
     }
-  ];
+  }, [retryCount]);
 
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-    const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(product.brand);
+  // Retry function with exponential backoff (commented out as unused)
+  // const retryFetchProducts = async () => {
+  //   if (retryCount >= 3) return;
+  //   
+  //   setRetryCount(prev => prev + 1);
+  //   const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+  //   
+  //   setTimeout(() => {
+  //     const filters = {
+  //       category: selectedCategory !== 'all' ? selectedCategory : null,
+  //       search: searchTerm || null,
+  //       minPrice: priceRange[0] > 0 ? priceRange[0] : null,
+  //       maxPrice: priceRange[1] < 1000000 ? priceRange[1] : null,
+  //       brands: selectedBrands.length > 0 ? selectedBrands : null,
+  //       sortBy: sortBy
+  //     };
+  //     fetchProducts(filters, true);
+  //   }, delay);
+  // };
+
+  // Initial load
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Refetch when filters change
+  useEffect(() => {
+    const filters = {
+      category: selectedCategory !== 'all' ? selectedCategory : null,
+      search: searchTerm || null,
+      minPrice: priceRange[0] > 0 ? priceRange[0] : null,
+      maxPrice: priceRange[1] < 1000000 ? priceRange[1] : null,
+      brands: selectedBrands.length > 0 ? selectedBrands : null,
+      sortBy: sortBy
+    };
     
-    return matchesCategory && matchesSearch && matchesPrice && matchesBrand;
-  });
-
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low':
-        return a.price - b.price;
-      case 'price-high':
-        return b.price - a.price;
-      case 'rating':
-        return b.rating - a.rating;
-      case 'newest':
-        return b.id - a.id;
-      default: // popular
-        return b.reviews - a.reviews;
+    // Only refetch if we have active filters (not initial state)
+    if (selectedCategory !== 'all' || searchTerm || priceRange[0] > 0 || priceRange[1] < 1000000 || selectedBrands.length > 0 || sortBy !== 'popular') {
+      fetchProducts(filters);
     }
-  });
+  }, [selectedCategory, searchTerm, priceRange, selectedBrands, sortBy]);
 
-  const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
-  const paginatedProducts = sortedProducts.slice(
+  // Extract unique brands from products
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set((products || []).map(product => product.brand).filter(Boolean))];
+    return uniqueBrands.sort();
+  }, [products]);
+
+  // Update categories with actual product counts
+  const categoriesWithCounts = useMemo(() => {
+    const categoryCounts = (products || []).reduce((acc, product) => {
+      acc[product.category] = (acc[product.category] || 0) + 1;
+      return acc;
+    }, {});
+
+    return [
+      { id: 'all', name: 'All Products', icon: '🏪', count: (products || []).length },
+      { id: 'dog-food', name: 'Dog Food', icon: '🐕', count: categoryCounts['dog-food'] || 0 },
+      { id: 'cat-food', name: 'Cat Food', icon: '🐱', count: categoryCounts['cat-food'] || 0 },
+      { id: 'accessories', name: 'Accessories', icon: '🎾', count: categoryCounts['accessories'] || 0 },
+      { id: 'toys', name: 'Toys', icon: '🧸', count: categoryCounts['toys'] || 0 },
+      { id: 'treats', name: 'Treats', icon: '🦴', count: categoryCounts['treats'] || 0 },
+      { id: 'supplements', name: 'Health', icon: '💊', count: categoryCounts['supplements'] || 0 }
+    ];
+  }, [products]);
+
+  // Products are now filtered and sorted by Supabase
+  const totalPages = Math.ceil((products || []).length / itemsPerPage);
+  const paginatedProducts = (products || []).slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -205,12 +185,8 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Toko Online Pet Food & Aksesoris
-              </h1>
-              <p className="text-gray-600">
-                {filteredProducts.length} produk ditemukan
-              </p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">Pet Store</h1>
+              <p className="text-xl text-gray-600 mb-8">Everything your furry friends need, delivered to your door</p>
             </div>
             
             <div className="flex items-center space-x-3">
@@ -220,7 +196,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-200 transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Kembali</span>
+                <span className="hidden sm:inline">Back</span>
               </button>
               
               {/* Services Button */}
@@ -234,7 +210,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-200 transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
               >
                 <Home className="w-4 h-4" />
-                <span className="hidden sm:inline">Layanan Lain</span>
+                <span className="hidden sm:inline">Other Services</span>
               </button>
               
               {/* Cart Button */}
@@ -243,7 +219,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                 className="bg-primary-600 text-white px-6 py-3 rounded-full hover:bg-primary-700 transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
               >
                 <ShoppingCart className="w-5 h-5" />
-                <span>Keranjang</span>
+                <span>Cart</span>
                 {cartItems.reduce((sum, item) => sum + item.quantity, 0) > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
                     {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
@@ -261,7 +237,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
           <div className="lg:w-1/4">
             <div className="bg-white rounded-2xl p-6 shadow-sm sticky top-8">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-900">Filter Produk</h3>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Categories</h2>
                 <button
                   onClick={clearFilters}
                   className="text-sm text-primary-600 hover:text-primary-700"
@@ -273,13 +249,13 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
               {/* Search */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cari Produk
+                  Search Products
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Nama produk, brand..."
+                    placeholder="Search for products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -289,25 +265,31 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
 
               {/* Categories */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Kategori
-                </label>
+                <h3 className="font-semibold text-gray-900 mb-3">Category</h3>
                 <div className="space-y-2">
-                  {categories.map((category) => (
+                  {categoriesWithCounts.map((category) => (
                     <button
                       key={category.id}
                       onClick={() => setSelectedCategory(category.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
                         selectedCategory === category.id
-                          ? 'bg-primary-100 text-primary-700'
+                          ? 'bg-primary-600 text-white'
                           : 'hover:bg-gray-100'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
-                        <span>{category.icon}</span>
-                        <span className="text-sm">{category.name}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{category.icon}</span>
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                        <span className={`text-sm px-2 py-1 rounded-full ${
+                          selectedCategory === category.id
+                            ? 'bg-white/20 text-white'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {category.count}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-500">{category.count}</span>
                     </button>
                   ))}
                 </div>
@@ -315,9 +297,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
 
               {/* Price Range */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Rentang Harga
-                </label>
+                <h3 className="font-semibold text-gray-900 mb-3">Price Range</h3>
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <input
@@ -341,9 +321,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
 
               {/* Brands */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Brand
-                </label>
+                <h3 className="font-semibold text-gray-900 mb-3">Brand</h3>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {brands.map((brand) => (
                     <label key={brand} className="flex items-center space-x-2 cursor-pointer">
@@ -390,34 +368,203 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
 
                 {/* Sort */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Urutkan:</span>
+                  <span className="text-sm text-gray-600">Sort by:</span>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
-                    <option value="popular">Terpopuler</option>
-                    <option value="newest">Terbaru</option>
-                    <option value="price-low">Harga Terendah</option>
-                    <option value="price-high">Harga Tertinggi</option>
-                    <option value="rating">Rating Tertinggi</option>
+                    <option value="popular">Most Popular</option>
+                    <option value="newest">Newest</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                    <option value="rating">Highest Rated</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* Products Grid/List */}
-            {paginatedProducts.length === 0 ? (
+            {/* Loading State */}
+            {loading ? (
+              <div className="space-y-8">
+                <SearchFilterSkeleton />
+                <ProductSkeleton count={12} viewMode={viewMode} />
+              </div>
+            ) : error ? (
               <div className="text-center py-16">
-                <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Produk Tidak Ditemukan</h3>
-                <p className="text-gray-600 mb-6">Coba ubah filter atau kata kunci pencarian.</p>
+                <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Error loading products</h3>
+                <p className="text-gray-600 mb-6">{error?.message || error}</p>
                 <button
-                  onClick={clearFilters}
+                  onClick={() => window.location.reload()}
                   className="bg-primary-600 text-white px-6 py-3 rounded-full hover:bg-primary-700 transition-colors"
                 >
-                  Reset Filter
+                  Try Again
                 </button>
+              </div>
+            ) : paginatedProducts.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="max-w-lg mx-auto">
+                  {/* Enhanced Visual Design */}
+                  <div className="relative mb-8">
+                    <div className="w-36 h-36 mx-auto bg-gradient-to-br from-primary-100 via-secondary-100 to-accent-100 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                      <div className="text-7xl animate-pulse">🛍️</div>
+                    </div>
+                    <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center shadow-md">
+                      <div className="text-3xl">🔍</div>
+                    </div>
+                  </div>
+                  
+                  {/* Context-Aware Messaging */}
+                  {searchTerm || selectedBrands.length > 0 || priceRange[0] > 0 || priceRange[1] < 1000000 ? (
+                    <>
+                      <h3 className="text-3xl font-bold text-gray-900 mb-4">Tidak Ada Produk Ditemukan</h3>
+                      <div className="text-gray-600 mb-8 space-y-2">
+                        <p>Kami tidak menemukan produk yang sesuai dengan kriteria:</p>
+                        <div className="flex flex-wrap justify-center gap-2 mt-4">
+                          {searchTerm && (
+                            <span className="bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm font-medium">
+                              🔍 \"{searchTerm}\"
+                            </span>
+                          )}
+                          {selectedBrands.length > 0 && (
+                            <span className="bg-secondary-100 text-secondary-800 px-3 py-1 rounded-full text-sm font-medium">
+                              🏷️ {selectedBrands.length} brand dipilih
+                            </span>
+                          )}
+                          {(priceRange[0] > 0 || priceRange[1] < 1000000) && (
+                            <span className="bg-accent-100 text-accent-800 px-3 py-1 rounded-full text-sm font-medium">
+                              💰 Rp {priceRange[0].toLocaleString()} - Rp {priceRange[1].toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Actionable Solutions */}
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                          <button
+                             onClick={clearFilters}
+                             className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-8 py-3 rounded-full hover:from-primary-700 hover:to-primary-800 transition-all duration-300 font-semibold transform hover:scale-105 shadow-lg"
+                           >
+                             🔄 Reset Semua Filter
+                           </button>
+                          <button
+                            onClick={() => {
+                              setSearchTerm('');
+                              setCurrentPage(1);
+                            }}
+                            className="bg-white text-primary-600 border-2 border-primary-600 px-8 py-3 rounded-full hover:bg-primary-50 transition-all duration-300 font-semibold shadow-md"
+                          >
+                            🗑️ Hapus Pencarian
+                          </button>
+                        </div>
+                        
+                        {/* Smart Suggestions */}
+                        <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl p-6 mt-8">
+                          <h4 className="font-bold text-gray-900 mb-4 flex items-center justify-center">
+                            <span className="text-xl mr-2">💡</span>
+                            Saran Pencarian
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="text-center">
+                              <p className="text-sm text-gray-600 mb-2">Coba kata kunci yang lebih umum</p>
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {['makanan', 'mainan', 'perawatan'].map((keyword) => (
+                                  <button
+                                    key={keyword}
+                                    onClick={() => {
+                                      setSearchTerm(keyword);
+                                      clearFilters();
+                                    }}
+                                    className="bg-white text-gray-700 px-3 py-1 rounded-full hover:bg-primary-100 hover:text-primary-700 transition-colors text-xs font-medium border"
+                                  >
+                                    {keyword}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm text-gray-600 mb-2">Perluas rentang harga</p>
+                              <button
+                                onClick={() => {
+                                  setPriceRange([0, 1000000]);
+                                  setCurrentPage(1);
+                                }}
+                                className="bg-green-100 text-green-700 px-4 py-2 rounded-full hover:bg-green-200 transition-colors text-sm font-medium"
+                              >
+                                💰 Semua Harga
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-3xl font-bold text-gray-900 mb-4">Toko Sedang Kosong</h3>
+                      <p className="text-gray-600 mb-8 text-lg leading-relaxed">
+                        Kami sedang mempersiapkan koleksi produk terbaik untuk hewan peliharaan kesayangan Anda.
+                        Mohon bersabar dan kembali lagi segera!
+                      </p>
+                      
+                      {/* Engagement Actions */}
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                          <button
+                            onClick={() => window.location.reload()}
+                            className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-8 py-3 rounded-full hover:from-primary-700 hover:to-primary-800 transition-all duration-300 font-semibold transform hover:scale-105 shadow-lg"
+                          >
+                            🔄 Muat Ulang Halaman
+                          </button>
+                          <button
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                            className="bg-white text-primary-600 border-2 border-primary-600 px-8 py-3 rounded-full hover:bg-primary-50 transition-all duration-300 font-semibold shadow-md"
+                          >
+                            📞 Hubungi Tim Kami
+                          </button>
+                        </div>
+                        
+                        {/* Newsletter & Updates */}
+                        <div className="bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50 rounded-2xl p-8 mt-8 shadow-inner">
+                          <div className="text-center mb-6">
+                            <div className="text-4xl mb-3">📬</div>
+                            <h4 className="text-xl font-bold text-gray-900 mb-2">Jadilah Yang Pertama Tahu!</h4>
+                            <p className="text-gray-600">Dapatkan notifikasi saat produk baru tersedia dan penawaran eksklusif lainnya.</p>
+                          </div>
+                          
+                          <div className="max-w-md mx-auto">
+                            <div className="flex gap-3">
+                              <input
+                                type="email"
+                                placeholder="Masukkan email Anda"
+                                className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+                              />
+                              <button className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-full hover:from-primary-700 hover:to-primary-800 transition-all duration-300 font-semibold shadow-lg transform hover:scale-105">
+                                Daftar
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center justify-center mt-4 space-x-4 text-sm text-gray-500">
+                              <span className="flex items-center">
+                                <span className="text-green-500 mr-1">✓</span>
+                                Gratis
+                              </span>
+                              <span className="flex items-center">
+                                <span className="text-green-500 mr-1">✓</span>
+                                Tanpa Spam
+                              </span>
+                              <span className="flex items-center">
+                                <span className="text-green-500 mr-1">✓</span>
+                                Bisa Berhenti Kapan Saja
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <>
@@ -500,7 +647,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                             ))}
                           </div>
                           <span className="text-sm text-gray-600">
-                            {product.rating} ({product.reviews})
+                            {product.rating} ({product.review_count})
                           </span>
                         </div>
                         
@@ -523,7 +670,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                           <div className={`text-sm font-medium ${
                             product.inStock ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {product.inStock ? '✅ Tersedia' : '❌ Stok Habis'}
+                            {product.inStock ? `✅ In Stock` : `❌ Out of Stock`}
                           </div>
                           
                           <button
@@ -536,7 +683,7 @@ const EcommercePage = ({ cartItems, addToCart, onOpenCart, onNavigateHome, onChe
                             }`}
                           >
                             <ShoppingCart className="w-4 h-4" />
-                            <span>Tambah</span>
+                            <span>Add to Cart</span>
                           </button>
                         </div>
                       </div>

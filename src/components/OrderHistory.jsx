@@ -1,110 +1,63 @@
 import { useState, useEffect } from 'react';
 import { Package, Clock, CheckCircle, XCircle, Eye, Truck, CreditCard } from 'lucide-react';
+import { getUserOrders } from '../lib/supabase';
 
 const OrderHistory = ({ user }) => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock order data
+  // Fetch real order data from Supabase
   useEffect(() => {
-    const mockOrders = [
-      {
-        id: 'PWR1735063175001',
-        date: '2024-12-24',
-        status: 'pending_payment',
-        total: 310000,
-        items: [
-          {
-            id: 1,
-            name: 'Royal Canin Adult Dog Food',
-            price: 285000,
-            quantity: 1,
-            image: '🐕'
-          }
-        ],
-        shipping: 25000,
-        paymentMethod: 'Bank Transfer',
-        shippingAddress: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10110'
-      },
-      {
-        id: 'PWR1735063175002',
-        date: '2024-12-23',
-        status: 'confirmed',
-        total: 97000,
-        items: [
-          {
-            id: 2,
-            name: 'Whiskas Adult Cat Food',
-            price: 45000,
-            quantity: 1,
-            image: '🐱'
-          },
-          {
-            id: 3,
-            name: 'Premium Dog Treats',
-            price: 27000,
-            quantity: 1,
-            image: '🦴'
-          }
-        ],
-        shipping: 25000,
-        paymentMethod: 'Bank Transfer',
-        shippingAddress: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10110'
-      },
-      {
-        id: 'PWR1735063175003',
-        date: '2024-12-22',
-        status: 'shipped',
-        total: 72000,
-        items: [
-          {
-            id: 4,
-            name: 'Cat Vitamin Supplement',
-            price: 47000,
-            quantity: 1,
-            image: '💊'
-          }
-        ],
-        shipping: 25000,
-        paymentMethod: 'Bank Transfer',
-        shippingAddress: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10110',
-        trackingNumber: 'JNE123456789'
-      },
-      {
-        id: 'PWR1735063175004',
-        date: '2024-12-20',
-        status: 'delivered',
-        total: 135000,
-        items: [
-          {
-            id: 5,
-            name: 'Premium Cat Food',
-            price: 85000,
-            quantity: 1,
-            image: '🐱'
-          },
-          {
-            id: 6,
-            name: 'Dog Toy Set',
-            price: 25000,
-            quantity: 1,
-            image: '🎾'
-          }
-        ],
-        shipping: 25000,
-        paymentMethod: 'Bank Transfer',
-        shippingAddress: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10110',
-        deliveredDate: '2024-12-21'
+    const fetchOrders = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
       }
-    ];
 
-    // Simulate loading
-    setTimeout(() => {
-      setOrders(mockOrders);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+      try {
+        setIsLoading(true);
+        setError(null);
+        const { data, error } = await getUserOrders(user.id);
+        
+        if (error) {
+          console.error('Error fetching orders:', error);
+          setError('Failed to load order history');
+          return;
+        }
+
+        // Transform Supabase data to match component structure
+        const transformedOrders = data?.map(order => ({
+          id: order.order_number,
+          date: order.created_at,
+          status: order.status,
+          total: parseFloat(order.total_amount),
+          items: order.order_items?.map(item => ({
+            id: item.id,
+            name: item.products?.name || 'Unknown Product',
+            price: parseFloat(item.unit_price),
+            quantity: item.quantity,
+            image: item.products?.image || '📦'
+          })) || [],
+          shipping: parseFloat(order.shipping_cost || 0),
+          paymentMethod: order.payment_method || 'Bank Transfer',
+          shippingAddress: order.shipping_address || 'No address provided',
+          trackingNumber: order.tracking_number,
+          deliveredDate: order.delivered_at
+        })) || [];
+
+        setOrders(transformedOrders);
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+        setError('Failed to load order history');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user?.id]);
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -178,6 +131,43 @@ const OrderHistory = ({ user }) => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <XCircle className="w-16 h-16 text-red-300 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error Loading Orders</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors font-semibold"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user?.id) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Login Required</h3>
+            <p className="text-gray-600 mb-6">Please log in to view your order history</p>
+            <button className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors font-semibold">
+              Login
+            </button>
           </div>
         </div>
       </div>

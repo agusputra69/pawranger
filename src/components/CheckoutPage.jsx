@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Upload, Check, Clock, CreditCard, User, MapPin, Phone, Mail } from 'lucide-react';
-
-const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
+import { supabase, createOrder, clearCart } from '../lib/supabase';
+const CheckoutPage = ({ cartItems, onBack, onOrderComplete, user }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [orderData, setOrderData] = useState({
     customerInfo: {
@@ -17,6 +17,9 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderId, setOrderId] = useState(null);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const bankAccounts = [
     {
@@ -73,43 +76,156 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
     }
   };
 
-  const handleSubmitOrder = async () => {
-    setIsSubmitting(true);
+  const validateForm = () => {
+    const errors = {};
     
-    // Simulate order submission
-    setTimeout(() => {
-      const newOrderId = 'PWR' + Date.now();
-      setOrderId(newOrderId);
-      setCurrentStep(4);
-      setIsSubmitting(false);
+    if (!orderData.customerInfo.name.trim()) errors.name = 'Name is required';
+    if (!orderData.customerInfo.email.trim()) errors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(orderData.customerInfo.email)) errors.email = 'Email is invalid';
+    if (!orderData.customerInfo.phone.trim()) errors.phone = 'Phone number is required';
+    if (!orderData.customerInfo.address.trim()) errors.address = 'Address is required';
+    if (!orderData.customerInfo.city.trim()) errors.city = 'City is required';
+    if (!orderData.customerInfo.postalCode.trim()) errors.postalCode = 'Postal code is required';
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmitOrder = async () => {
+    if (!validateForm()) {
+      setError('Please fill in all required fields correctly');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      // Generate order number
+      const orderNumber = 'PWR' + Date.now();
       
-      // Clear cart and notify parent
-      if (onOrderComplete) {
-        onOrderComplete(newOrderId);
+      // Calculate totals
+      const { subtotal, shipping, total } = calculateTotal();
+      
+      // Create order data for database
+       const dbOrderData = {
+         user_id: user?.id,
+         order_number: orderNumber,
+         status: 'pending_payment',
+         total_amount: total,
+         shipping_cost: shipping,
+         subtotal: subtotal,
+         customer_name: orderData.customerInfo.name,
+         customer_email: orderData.customerInfo.email,
+         customer_phone: orderData.customerInfo.phone,
+         shipping_address: orderData.customerInfo.address,
+         shipping_city: orderData.customerInfo.city,
+         shipping_postal_code: orderData.customerInfo.postalCode,
+         notes: orderData.notes,
+         payment_method: 'bank_transfer',
+         payment_proof_url: null // Will be updated when file is uploaded
+       };
+      
+      // Create order in database
+       const { data: order, error: orderError } = await createOrder(dbOrderData);
+      
+      if (orderError) {
+        throw new Error('Failed to create order: ' + orderError.message);
       }
-    }, 2000);
+      
+      // Create order items
+      const orderItems = cartItems.map(item => ({
+        order_id: order[0].id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+      
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+      
+      if (itemsError) {
+        throw new Error('Failed to create order items: ' + itemsError.message);
+      }
+      
+      // Upload payment proof if provided
+      if (orderData.paymentProof) {
+        const fileExt = orderData.paymentProof.name.split('.').pop();
+        const fileName = `${order[0].id}/payment_proof.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('order-documents')
+          .upload(fileName, orderData.paymentProof);
+        
+        if (!uploadError) {
+          // Update order with payment proof URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('order-documents')
+            .getPublicUrl(fileName);
+          
+          await supabase
+            .from('orders')
+            .update({ payment_proof_url: publicUrl })
+            .eq('id', order[0].id);
+        }
+      }
+      
+      // Clear cart for authenticated users
+      if (user) {
+        await clearCart();
+      }
+      
+      // Set success state
+      setOrderId(order[0].order_number);
+      setCurrentStep(4);
+      
+      // Notify parent component
+      if (onOrderComplete) {
+        onOrderComplete(order[0].order_number);
+      }
+      
+    } catch (error) {
+      console.error('Order submission error:', error);
+      setError(error.message || 'Failed to submit order. Please try again.');
+      setRetryCount(prev => prev + 1);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const retryOrder = () => {
+    setError(null);
+    setValidationErrors({});
+    handleSubmitOrder();
   };
 
   const { subtotal, shipping, total } = calculateTotal();
 
   const renderStep1 = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Informasi Pengiriman</h3>
+      <h3 className="text-xl font-bold text-gray-900 mb-4">Shipping Information</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <User className="w-4 h-4 inline mr-2" />
-            Nama Lengkap *
+            Full Name *
           </label>
           <input
             type="text"
             value={orderData.customerInfo.name}
             onChange={(e) => handleInputChange('name', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder="Masukkan nama lengkap"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              validationErrors.name ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder="Enter your full name"
             required
           />
+          {validationErrors.name && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+          )}
         </div>
         
         <div>
@@ -121,84 +237,109 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
             type="email"
             value={orderData.customerInfo.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              validationErrors.email ? 'border-red-500' : 'border-gray-300'
+            }`}
             placeholder="email@example.com"
             required
           />
+          {validationErrors.email && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
+          )}
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <Phone className="w-4 h-4 inline mr-2" />
-            Nomor Telepon *
+            Phone Number *
           </label>
           <input
             type="tel"
             value={orderData.customerInfo.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder="08xxxxxxxxxx"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              validationErrors.phone ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder="Enter your phone number"
             required
           />
+          {validationErrors.phone && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
+          )}
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Kota *
+            City *
           </label>
           <input
             type="text"
             value={orderData.customerInfo.city}
             onChange={(e) => handleInputChange('city', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder="Nama kota"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              validationErrors.city ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder="Enter your city"
             required
           />
+          {validationErrors.city && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.city}</p>
+          )}
         </div>
       </div>
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           <MapPin className="w-4 h-4 inline mr-2" />
-          Alamat Lengkap *
+          Full Address *
         </label>
         <textarea
           value={orderData.customerInfo.address}
           onChange={(e) => handleInputChange('address', e.target.value)}
           rows={3}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+            validationErrors.address ? 'border-red-500' : 'border-gray-300'
+          }`}
+          placeholder="Enter your complete address"
           required
         />
+        {validationErrors.address && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.address}</p>
+        )}
       </div>
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Kode Pos *
+          Postal Code *
         </label>
         <input
           type="text"
           value={orderData.customerInfo.postalCode}
           onChange={(e) => handleInputChange('postalCode', e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          placeholder="12345"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+            validationErrors.postalCode ? 'border-red-500' : 'border-gray-300'
+          }`}
+          placeholder="Enter postal code"
           required
         />
+        {validationErrors.postalCode && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.postalCode}</p>
+        )}
       </div>
     </div>
   );
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Metode Pembayaran</h3>
+      <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Method</h3>
       
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <div className="flex items-center mb-2">
           <CreditCard className="w-5 h-5 text-blue-600 mr-2" />
-          <h4 className="font-semibold text-blue-900">Transfer Bank Manual</h4>
+          <h4 className="font-semibold text-blue-900">Bank Transfer</h4>
         </div>
         <p className="text-blue-700 text-sm">
-          Silakan transfer ke salah satu rekening di bawah ini, lalu upload bukti transfer.
+          Please transfer the exact amount to one of the bank accounts below
         </p>
       </div>
       
@@ -219,7 +360,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
                   onClick={() => navigator.clipboard.writeText(bank.accountNumber)}
                   className="text-primary-600 text-sm hover:text-primary-700"
                 >
-                  Salin Nomor
+                  Copy Number
                 </button>
               </div>
             </div>
@@ -228,10 +369,10 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
       </div>
       
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h4 className="font-semibold text-yellow-900 mb-2">Jumlah yang harus ditransfer:</h4>
+        <h4 className="font-semibold text-yellow-900 mb-2">Transfer Amount:</h4>
         <p className="text-2xl font-bold text-yellow-900">{formatPrice(total)}</p>
         <p className="text-yellow-700 text-sm mt-2">
-          Pastikan nominal transfer sesuai dengan jumlah di atas untuk mempercepat verifikasi.
+          Please transfer the exact amount including shipping cost
         </p>
       </div>
     </div>
@@ -239,7 +380,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Upload Bukti Transfer</h3>
+      <h3 className="text-xl font-bold text-gray-900 mb-4">Upload Payment Proof</h3>
       
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 transition-colors">
         <input
@@ -251,12 +392,12 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
         />
         <label htmlFor="payment-proof" className="cursor-pointer">
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">Upload Bukti Transfer</h4>
+          <h4 className="text-lg font-semibold text-gray-900 mb-2">Upload Payment Proof</h4>
           <p className="text-gray-600 mb-4">
-            Klik untuk memilih file atau drag & drop
+            Click to select or drag and drop your payment proof image
           </p>
           <p className="text-sm text-gray-500">
-            Format: JPG, PNG, PDF (Max 5MB)
+            Supported formats: JPG, PNG, PDF (Max 5MB)
           </p>
         </label>
       </div>
@@ -266,7 +407,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
           <div className="flex items-center">
             <Check className="w-5 h-5 text-green-600 mr-2" />
             <span className="text-green-800 font-medium">
-              File berhasil dipilih: {orderData.paymentProof.name}
+              File Selected: {orderData.paymentProof.name}
             </span>
           </div>
         </div>
@@ -274,14 +415,14 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Catatan (Opsional)
+          Additional Notes
         </label>
         <textarea
           value={orderData.notes}
           onChange={(e) => setOrderData(prev => ({ ...prev, notes: e.target.value }))}
           rows={3}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          placeholder="Tambahkan catatan untuk pesanan Anda..."
+          placeholder="Any additional information or special requests"
         />
       </div>
     </div>
@@ -294,23 +435,23 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
       </div>
       
       <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Pesanan Berhasil Dibuat!</h3>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h3>
         <p className="text-gray-600 mb-4">
-          Terima kasih atas pesanan Anda. Kami akan memverifikasi pembayaran dalam 1x24 jam.
+          Thank you for your order. We have received your payment proof and will process your order shortly.
         </p>
         
         <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <h4 className="font-semibold text-gray-900 mb-2">ID Pesanan:</h4>
+          <h4 className="font-semibold text-gray-900 mb-2">Order ID:</h4>
           <p className="text-xl font-mono font-bold text-primary-600">{orderId}</p>
         </div>
         
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-center mb-2">
             <Clock className="w-5 h-5 text-blue-600 mr-2" />
-            <h4 className="font-semibold text-blue-900">Status: Menunggu Verifikasi</h4>
+            <h4 className="font-semibold text-blue-900">Status: Pending Verification</h4>
           </div>
           <p className="text-blue-700 text-sm">
-            Kami akan mengirim konfirmasi melalui email setelah pembayaran terverifikasi.
+            We will verify your payment and send a confirmation email within 24 hours.
           </p>
         </div>
       </div>
@@ -345,7 +486,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
             className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Kembali
+            Back
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
         </div>
@@ -373,6 +514,30 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
               ))}
             </div>
 
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="text-red-500 mr-3">⚠️</div>
+                    <div>
+                      <h4 className="font-semibold text-red-900">Order Submission Failed</h4>
+                      <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={retryOrder}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    Try Again
+                  </button>
+                </div>
+                {retryCount > 0 && (
+                  <p className="text-red-600 text-xs mt-2">Retry attempt: {retryCount}</p>
+                )}
+              </div>
+            )}
+
             {/* Step Content */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               {currentStep === 1 && renderStep1()}
@@ -389,7 +554,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
                   disabled={currentStep === 1}
                   className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Sebelumnya
+                  Previous
                 </button>
                 
                 {currentStep < 3 ? (
@@ -398,7 +563,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
                     disabled={!isStepValid()}
                     className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Selanjutnya
+                    Next
                   </button>
                 ) : (
                   <button
@@ -409,10 +574,10 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Memproses...
+                        Processing...
                       </>
                     ) : (
-                      'Buat Pesanan'
+                      'Place Order'
                     )}
                   </button>
                 )}
@@ -423,7 +588,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Ringkasan Pesanan</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h3>
               
               <div className="space-y-3 mb-4">
                 {cartItems.map((item) => (
@@ -444,7 +609,7 @@ const CheckoutPage = ({ cartItems, onBack, onOrderComplete }) => {
                   <span>{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Ongkos Kirim</span>
+                  <span className="text-gray-600">Shipping</span>
                   <span>{formatPrice(shipping)}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Menu, X, Phone, MapPin, Clock, ShoppingBag, ShoppingCart, User, LogOut, ChevronDown } from 'lucide-react';
 
 const Header = ({ 
@@ -9,8 +9,11 @@ const Header = ({
   user,
   onLogin,
   onLogout,
-  onNavigateToDashboard
+  onNavigateToDashboard,
+  cartError = null,
+  isCartLoading = false
 }) => {
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isInfoDropdownOpen, setIsInfoDropdownOpen] = useState(false);
@@ -71,7 +74,7 @@ const Header = ({
           </div>
           <div className="flex items-center space-x-1">
             <Clock className="w-4 h-4" />
-            <span>Buka: 08:00 - 20:00 WIB</span>
+            <span>Hours: 08:00 - 20:00 WIB</span>
           </div>
         </div>
       </div>
@@ -101,13 +104,13 @@ const Header = ({
                 onClick={() => smoothScroll('home')} 
                 className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 hover:scale-105"
               >
-                Beranda
+                Home
               </button>
               <button 
                 onClick={() => smoothScroll('services')} 
                 className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 hover:scale-105"
               >
-                Layanan
+                Services
               </button>
               <button 
                 onClick={onNavigateToEcommerce} 
@@ -137,7 +140,7 @@ const Header = ({
                       }}
                       className="w-full text-left px-4 py-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 transition-colors"
                     >
-                      Tentang Kami
+                      About
                     </button>
                     <button 
                       onClick={() => {
@@ -146,7 +149,7 @@ const Header = ({
                       }}
                       className="w-full text-left px-4 py-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 transition-colors"
                     >
-                      Galeri
+                      Gallery
                     </button>
                     <button 
                       onClick={() => {
@@ -155,7 +158,7 @@ const Header = ({
                       }}
                       className="w-full text-left px-4 py-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 transition-colors"
                     >
-                      Kontak
+                      Contact
                     </button>
                   </div>
                 )}
@@ -164,16 +167,30 @@ const Header = ({
 
             {/* CTA Button & Cart */}
             <div className="hidden md:flex items-center space-x-4">
+
               {/* Cart Button */}
               <button 
                 onClick={onOpenCart}
-                className="relative p-2 text-gray-700 hover:text-primary-600 transition-colors"
+                className={`relative p-2 transition-colors ${
+                  isCartLoading 
+                    ? 'text-gray-400 cursor-not-allowed' 
+                    : cartError 
+                    ? 'text-red-500 hover:text-red-600' 
+                    : 'text-gray-700 hover:text-primary-600'
+                }`}
+                disabled={isCartLoading}
+                title={cartError || (isCartLoading ? 'Loading...' : 'View Cart')}
               >
                 <ShoppingCart className="w-6 h-6" />
                 {cartItemsCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {cartItemsCount}
                   </span>
+                )}
+                {isCartLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-primary-600 rounded-full animate-spin"></div>
+                  </div>
                 )}
               </button>
               
@@ -209,7 +226,7 @@ const Header = ({
                 onClick={onNavigateToBooking}
                 className="bg-primary-600 text-white px-6 py-2 rounded-full hover:bg-primary-700 transition-colors font-medium"
               >
-                Booking Sekarang
+                Book Now
               </button>
             </div>
 
@@ -237,21 +254,24 @@ const Header = ({
                   onClick={() => smoothScroll('home')}
                   className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2"
                 >
-                  Beranda
+                  Home
                 </button>
                 <button
                   onClick={() => smoothScroll('services')}
                   className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2"
                 >
-                  Layanan
+                  Services
                 </button>
                 <button
-                onClick={onNavigateToEcommerce}
-                className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2 flex items-center space-x-2"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>Shop</span>
-              </button>
+                  onClick={() => {
+                    onNavigateToEcommerce();
+                    setIsMenuOpen(false);
+                  }}
+                  className="text-gray-700 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2 flex items-center space-x-2"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Shop</span>
+                </button>
                 
                 {/* Mobile Info Section */}
                 <div>
@@ -273,7 +293,7 @@ const Header = ({
                         }}
                         className="text-gray-600 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2 block"
                       >
-                        Tentang Kami
+                        About
                       </button>
                       <button
                         onClick={() => {
@@ -282,7 +302,7 @@ const Header = ({
                         }}
                         className="text-gray-600 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2 block"
                       >
-                        Galeri
+                        Gallery
                       </button>
                       <button
                         onClick={() => {
@@ -291,19 +311,28 @@ const Header = ({
                         }}
                         className="text-gray-600 hover:text-primary-600 font-medium transition-all duration-300 text-left hover:translate-x-2 block"
                       >
-                        Kontak
+                        Contact
                       </button>
                     </div>
                   </div>
                 </div>
+
+
                 {/* Mobile Cart & User */}
                 <div className="flex items-center space-x-3">
                   <button 
                     onClick={onOpenCart}
-                    className="relative p-3 text-gray-700 hover:text-primary-600 transition-colors border border-gray-300 rounded-full flex-1 flex items-center justify-center space-x-2"
+                    className={`relative p-3 transition-colors border rounded-full flex-1 flex items-center justify-center space-x-2 ${
+                      isCartLoading 
+                        ? 'text-gray-400 border-gray-200 cursor-not-allowed' 
+                        : cartError 
+                        ? 'text-red-500 border-red-300 hover:text-red-600' 
+                        : 'text-gray-700 border-gray-300 hover:text-primary-600'
+                    }`}
+                    disabled={isCartLoading}
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    <span>Keranjang</span>
+                    <span>{isCartLoading ? 'Loading...' : 'Cart'}</span>
                     {cartItemsCount > 0 && (
                       <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                         {cartItemsCount}
@@ -344,7 +373,7 @@ const Header = ({
                   onClick={onNavigateToBooking}
                   className="bg-primary-600 text-white px-6 py-3 rounded-full hover:bg-primary-700 transition-all duration-300 font-medium w-full transform hover:scale-105"
                 >
-                  Booking Sekarang
+                  Book Now
                 </button>
               </nav>
             </div>
@@ -355,4 +384,4 @@ const Header = ({
   );
 };
 
-export default Header;
+export default memo(Header);

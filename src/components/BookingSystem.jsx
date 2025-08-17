@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, User, Phone, Mail, MapPin, Check, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { createBooking, supabase } from '../lib/supabase';
 
-const BookingSystem = () => {
+const BookingSystem = ({ user, onLogin }) => {
   const [selectedService, setSelectedService] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -17,8 +18,13 @@ const BookingSystem = () => {
     petAge: '',
     specialNotes: ''
   });
+  const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  // const [loading, setLoading] = useState(false); // Removed unused state
+  const [error, setError] = useState(null);
+  const [bookingId, setBookingId] = useState(null);
 
   const services = [
     {
@@ -89,6 +95,41 @@ const BookingSystem = () => {
     '16:00', '16:30', '17:00'
   ];
 
+  // Fetch booked slots for a specific date
+  const fetchBookedSlots = async (date) => {
+    if (!date) return;
+    
+    try {
+      const dateString = date.toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('appointment_time')
+        .eq('appointment_date', dateString)
+        .in('status', ['confirmed', 'pending']);
+      
+      if (error) {
+        console.error('Error fetching booked slots:', error);
+        return;
+      }
+      
+      setBookedSlots(data.map(booking => booking.appointment_time));
+    } catch (err) {
+      console.error('Error fetching booked slots:', err);
+    }
+  };
+
+  // Check if a time slot is available
+  const isTimeSlotAvailable = (time) => {
+    return !bookedSlots.includes(time);
+  };
+
+  // Load booked slots when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      fetchBookedSlots(selectedDate);
+    }
+  }, [selectedDate]);
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -133,22 +174,120 @@ const BookingSystem = () => {
     }
   };
 
+  const validateField = (field, value) => {
+    const errors = {};
+    
+    switch (field) {
+      case 'customerName':
+        if (!value.trim()) {
+          errors.customerName = 'Nama lengkap wajib diisi';
+        } else if (value.trim().length < 2) {
+          errors.customerName = 'Nama minimal 2 karakter';
+        }
+        break;
+      case 'customerPhone':
+        if (!value.trim()) {
+          errors.customerPhone = 'Nomor telepon wajib diisi';
+        } else if (!/^[0-9+\-\s()]{10,15}$/.test(value.replace(/\s/g, ''))) {
+          errors.customerPhone = 'Format nomor telepon tidak valid';
+        }
+        break;
+      case 'customerEmail':
+        if (!value.trim()) {
+          errors.customerEmail = 'Email wajib diisi';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors.customerEmail = 'Format email tidak valid';
+        }
+        break;
+      case 'petName':
+        if (!value.trim()) {
+          errors.petName = 'Nama hewan peliharaan wajib diisi';
+        }
+        break;
+      case 'petType':
+        if (!value.trim()) {
+          errors.petType = 'Jenis hewan peliharaan wajib diisi';
+        }
+        break;
+      case 'petAge':
+        if (value && (isNaN(value) || parseInt(value) < 0 || parseInt(value) > 30)) {
+          errors.petAge = 'Umur harus berupa angka antara 0-30 tahun';
+        }
+        break;
+    }
+    
+    return errors;
+  };
+
   const handleInputChange = (field, value) => {
     setBookingData(prev => ({
       ...prev,
       [field]: value
     }));
+    
+    // Clear validation error for this field
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+    
+    // Validate field on blur (when user moves to next field)
+    const fieldErrors = validateField(field, value);
+    if (Object.keys(fieldErrors).length > 0) {
+      setValidationErrors(prev => ({ ...prev, ...fieldErrors }));
+    }
   };
 
   const handleSubmitBooking = async () => {
+    if (!user) {
+      setError('Please login to make a booking');
+      if (onLogin) onLogin();
+      return;
+    }
+
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const bookingPayload = {
+        user_id: user.id,
+        service_type: selectedService.name,
+        appointment_date: selectedDate.toISOString().split('T')[0],
+        appointment_time: selectedTime,
+        customer_name: bookingData.customerName,
+        customer_phone: bookingData.customerPhone,
+        customer_email: bookingData.customerEmail,
+        pet_name: bookingData.petName,
+        pet_type: bookingData.petType,
+        pet_breed: bookingData.petBreed,
+        pet_age: parseInt(bookingData.petAge),
+        special_notes: bookingData.specialNotes,
+        total_price: selectedService.price,
+        status: 'pending'
+      };
+
+      const result = await createBooking(bookingPayload);
+      
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      setBookingId(result.data.id);
       setBookingComplete(true);
       setBookingStep(4);
-    }, 2000);
+      
+      // Refresh booked slots after successful booking
+      await fetchBookedSlots(selectedDate);
+      
+    } catch (err) {
+      console.error('Booking error:', err);
+      setError(err.message || 'Failed to create booking. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetBooking = () => {
@@ -169,14 +308,38 @@ const BookingSystem = () => {
     setBookingComplete(false);
   };
 
+  const validateStep = (step) => {
+    const errors = {};
+    
+    if (step === 3) {
+      // Validate all required fields for step 3
+      const requiredFields = ['customerName', 'customerPhone', 'customerEmail', 'petName', 'petType'];
+      
+      requiredFields.forEach(field => {
+        const fieldErrors = validateField(field, bookingData[field]);
+        Object.assign(errors, fieldErrors);
+      });
+      
+      // Validate pet age if provided
+      if (bookingData.petAge) {
+        const ageErrors = validateField('petAge', bookingData.petAge);
+        Object.assign(errors, ageErrors);
+      }
+    }
+    
+    return errors;
+  };
+
   const canProceedToNext = () => {
     switch (bookingStep) {
       case 1:
         return selectedService !== null;
       case 2:
         return selectedDate !== null && selectedTime !== null;
-      case 3:
-        return bookingData.customerName && bookingData.customerPhone && bookingData.petName && bookingData.petType;
+      case 3: {
+         const errors = validateStep(3);
+         return Object.keys(errors).length === 0;
+       }
       default:
         return false;
     }
@@ -194,10 +357,14 @@ const BookingSystem = () => {
             Booking Berhasil!
           </h2>
           
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-2">
             Terima kasih {bookingData.customerName}! Booking Anda untuk {selectedService?.name} 
             pada {selectedDate?.toLocaleDateString('id-ID')} pukul {selectedTime} telah dikonfirmasi.
           </p>
+          
+          {bookingId && (
+            <p className="text-sm text-gray-500 mb-6">Booking ID: <span className="font-mono font-medium">{bookingId}</span></p>
+          )}
           
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
             <h3 className="font-semibold text-gray-900 mb-2">Detail Booking:</h3>
@@ -206,6 +373,7 @@ const BookingSystem = () => {
               <p><strong>Tanggal:</strong> {selectedDate?.toLocaleDateString('id-ID')}</p>
               <p><strong>Waktu:</strong> {selectedTime}</p>
               <p><strong>Pet:</strong> {bookingData.petName} ({bookingData.petType})</p>
+              <p><strong>Status:</strong> <span className="text-yellow-600">Pending Confirmation</span></p>
               <p><strong>Total:</strong> {formatPrice(selectedService?.price)}</p>
             </div>
           </div>
@@ -239,6 +407,15 @@ const BookingSystem = () => {
             Jadwalkan layanan terbaik untuk hewan peliharaan Anda
           </p>
         </div>
+        
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <X className="w-5 h-5 text-red-500 mr-2" />
+              <p className="text-red-700">{error}</p>
+            </div>
+          </div>
+        )}
 
         {/* Progress Steps */}
         <div className="max-w-4xl mx-auto mb-8">
@@ -395,19 +572,28 @@ const BookingSystem = () => {
                   
                   {selectedDate ? (
                     <div className="grid grid-cols-3 gap-3">
-                      {timeSlots.map((time) => (
-                        <button
-                          key={time}
-                          onClick={() => setSelectedTime(time)}
-                          className={`py-3 px-4 rounded-lg text-sm font-medium transition-colors ${
-                            selectedTime === time
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-primary-100'
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      ))}
+                      {timeSlots.map((time) => {
+                        const isAvailable = isTimeSlotAvailable(time);
+                        return (
+                          <button
+                            key={time}
+                            onClick={() => isAvailable && setSelectedTime(time)}
+                            disabled={!isAvailable}
+                            className={`py-3 px-4 rounded-lg text-sm font-medium transition-colors ${
+                              !isAvailable
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : selectedTime === time
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-primary-100'
+                            }`}
+                          >
+                            {time}
+                            {!isAvailable && (
+                              <div className="text-xs mt-1 text-gray-400">Booked</div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
@@ -440,9 +626,14 @@ const BookingSystem = () => {
                         type="text"
                         value={bookingData.customerName}
                         onChange={(e) => handleInputChange('customerName', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.customerName ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="Masukkan nama lengkap"
                       />
+                      {validationErrors.customerName && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.customerName}</p>
+                      )}
                     </div>
                     
                     <div>
@@ -453,22 +644,32 @@ const BookingSystem = () => {
                         type="tel"
                         value={bookingData.customerPhone}
                         onChange={(e) => handleInputChange('customerPhone', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.customerPhone ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="08xxxxxxxxxx"
                       />
+                      {validationErrors.customerPhone && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.customerPhone}</p>
+                      )}
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email
+                        Email *
                       </label>
                       <input
                         type="email"
                         value={bookingData.customerEmail}
                         onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.customerEmail ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="email@example.com"
                       />
+                      {validationErrors.customerEmail && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.customerEmail}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -485,9 +686,14 @@ const BookingSystem = () => {
                         type="text"
                         value={bookingData.petName}
                         onChange={(e) => handleInputChange('petName', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.petName ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="Nama hewan peliharaan"
                       />
+                      {validationErrors.petName && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.petName}</p>
+                      )}
                     </div>
                     
                     <div>
@@ -497,7 +703,9 @@ const BookingSystem = () => {
                       <select
                         value={bookingData.petType}
                         onChange={(e) => handleInputChange('petType', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.petType ? 'border-red-300' : 'border-gray-300'
+                        }`}
                       >
                         <option value="">Pilih jenis hewan</option>
                         <option value="Anjing">Anjing</option>
@@ -507,6 +715,9 @@ const BookingSystem = () => {
                         <option value="Burung">Burung</option>
                         <option value="Lainnya">Lainnya</option>
                       </select>
+                      {validationErrors.petType && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.petType}</p>
+                      )}
                     </div>
                     
                     <div>
@@ -524,15 +735,22 @@ const BookingSystem = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Umur
+                        Umur (tahun)
                       </label>
                       <input
-                        type="text"
+                        type="number"
                         value={bookingData.petAge}
                         onChange={(e) => handleInputChange('petAge', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        placeholder="Contoh: 2 tahun, 6 bulan"
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                          validationErrors.petAge ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="Contoh: 2"
+                        min="0"
+                        max="30"
                       />
+                      {validationErrors.petAge && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.petAge}</p>
+                      )}
                     </div>
                   </div>
                 </div>

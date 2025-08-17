@@ -1,25 +1,25 @@
-import { useState } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 
 const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onNavigateToEcommerce, onCheckout }) => {
 
-
-
-  const formatPrice = (price) => {
+  const formatPrice = useCallback((price) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0
     }).format(price);
-  };
+  }, []);
 
-  const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
+  const totalPrice = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, [cartItems]);
 
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
+  const totalItems = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [cartItems]);
+
+  // Memoized calculations are now defined above
 
   const handleCheckout = () => {
     if (cartItems.length === 0) return;
@@ -53,7 +53,7 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
               </h2>
               {cartItems.length > 0 && (
                 <span className="bg-primary-600 text-white text-sm rounded-full w-6 h-6 flex items-center justify-center">
-                  {getTotalItems()}
+                  {totalItems}
                 </span>
               )}
             </div>
@@ -152,9 +152,9 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
             <div className="border-t p-6 space-y-4">
               {/* Total */}
               <div className="flex items-center justify-between text-lg font-bold">
-                <span>Total:</span>
+                <span>Total ({totalItems} items):</span>
                 <span className="text-primary-600">
-                  {formatPrice(getTotalPrice())}
+                  {formatPrice(totalPrice)}
                 </span>
               </div>
               
@@ -163,9 +163,9 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
                 <div className="flex items-center space-x-2">
                   <span className="text-green-600">🚚</span>
                   <span>
-                    {getTotalPrice() >= 200000 
+                    {totalPrice >= 200000 
                       ? 'Gratis ongkir untuk pesanan ini!' 
-                      : `Tambah ${formatPrice(200000 - getTotalPrice())} lagi untuk gratis ongkir`
+                      : `Tambah ${formatPrice(200000 - totalPrice)} lagi untuk gratis ongkir`
                     }
                   </span>
                 </div>
@@ -205,4 +205,4 @@ const CartModal = ({ isOpen, onClose, cartItems, updateQuantity, removeItem, onN
   );
 };
 
-export default CartModal;
+export default memo(CartModal);

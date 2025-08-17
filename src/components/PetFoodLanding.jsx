@@ -62,15 +62,7 @@ const PetFoodLanding = ({ onNavigateToEcommerce }) => {
     { number: '99%', label: 'Tingkat Kepuasan' }
   ];
 
-  const smoothScroll = (targetId) => {
-    const element = document.getElementById(targetId);
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }
-  };
+
 
   return (
     <section className="relative py-20 bg-gradient-to-br from-primary-50 via-white to-secondary-50 overflow-hidden">

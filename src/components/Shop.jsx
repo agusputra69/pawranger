@@ -1,10 +1,47 @@
-import { useState } from 'react';
-import { ShoppingCart, Star, Heart, Filter, Search, Plus, Minus } from 'lucide-react';
+import React, { useState, memo, useMemo, useCallback, useEffect } from 'react';
+import { ShoppingCart, Star, Heart, Filter, Search, Plus, Minus, Loader2 } from 'lucide-react';
+import { getProducts } from '../lib/supabase';
+import ProductSkeleton, { CategoryFilterSkeleton, SearchFilterSkeleton } from './ProductSkeleton';
 
-const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
+const Shop = ({ cartItems, addToCart, onOpenCart }) => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [wishlist, setWishlist] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const formatPrice = useCallback((price) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(price);
+  }, []);
+
+  // Fetch products from Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const { data, error: fetchError } = await getProducts();
+        
+        if (fetchError) {
+          throw fetchError;
+        }
+        
+        setProducts(data || []);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Gagal memuat produk. Silakan coba lagi.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const categories = [
     { id: 'all', name: 'Semua Produk', icon: '🛍️' },
@@ -15,105 +52,14 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
     { id: 'accessories', name: 'Aksesoris', icon: '🎾' }
   ];
 
-  const products = [
-    {
-      id: 1,
-      name: 'Royal Canin Adult Dog Food',
-      category: 'dog-food',
-      price: 285000,
-      originalPrice: 320000,
-      rating: 4.8,
-      reviews: 156,
-      image: '🐕',
-      description: 'Makanan anjing dewasa dengan nutrisi seimbang',
-      weight: '3kg',
-      brand: 'Royal Canin',
-      inStock: true,
-      discount: 11
-    },
-    {
-      id: 2,
-      name: 'Whiskas Adult Cat Food',
-      category: 'cat-food',
-      price: 45000,
-      originalPrice: 52000,
-      rating: 4.6,
-      reviews: 89,
-      image: '🐱',
-      description: 'Makanan kucing dewasa rasa tuna dan salmon',
-      weight: '1.2kg',
-      brand: 'Whiskas',
-      inStock: true,
-      discount: 13
-    },
-    {
-      id: 3,
-      name: 'Pedigree Dentastix',
-      category: 'treats',
-      price: 35000,
-      originalPrice: 40000,
-      rating: 4.7,
-      reviews: 234,
-      image: '🦴',
-      description: 'Snack pembersih gigi untuk anjing',
-      weight: '180g',
-      brand: 'Pedigree',
-      inStock: true,
-      discount: 12
-    },
-    {
-      id: 4,
-      name: 'Pro Plan Puppy Food',
-      category: 'dog-food',
-      price: 195000,
-      originalPrice: 220000,
-      rating: 4.9,
-      reviews: 78,
-      image: '🐶',
-      description: 'Makanan anak anjing dengan DHA untuk perkembangan otak',
-      weight: '2.5kg',
-      brand: 'Pro Plan',
-      inStock: true,
-      discount: 11
-    },
-    {
-      id: 5,
-      name: 'Felix Cat Treats',
-      category: 'treats',
-      price: 25000,
-      originalPrice: 28000,
-      rating: 4.5,
-      reviews: 145,
-      image: '🐾',
-      description: 'Snack kucing rasa ayam dan hati',
-      weight: '60g',
-      brand: 'Felix',
-      inStock: false,
-      discount: 10
-    },
-    {
-      id: 6,
-      name: 'Vitamin Pet Health Plus',
-      category: 'supplements',
-      price: 125000,
-      originalPrice: 145000,
-      rating: 4.4,
-      reviews: 67,
-      image: '💊',
-      description: 'Multivitamin untuk kesehatan hewan peliharaan',
-      weight: '100 tablet',
-      brand: 'Pet Health',
-      inStock: true,
-      discount: 14
-    }
-  ];
-
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (product.brand && product.brand.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, selectedCategory, searchTerm]);
 
 
 
@@ -125,13 +71,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
     );
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
+
 
   const getTotalCartItems = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
@@ -203,22 +143,60 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
           ))}
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="space-y-8">
+            <CategoryFilterSkeleton />
+            <SearchFilterSkeleton />
+            <ProductSkeleton count={8} />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Terjadi Kesalahan</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-primary-600 text-white px-6 py-2 rounded-full hover:bg-primary-700 transition-colors"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
         {/* Products Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredProducts.map((product) => (
+        {!loading && !error && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredProducts.map((product) => (
             <div
               key={product.id}
               className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group transform hover:-translate-y-2"
             >
               {/* Product Image & Discount Badge */}
               <div className="relative mb-4">
-                <div className="w-full h-48 bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl flex items-center justify-center text-6xl mb-4">
-                  {product.image}
+                <div className="w-full h-48 bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl flex items-center justify-center overflow-hidden mb-4">
+                  {product.image_url ? (
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name}
+                      className="w-full h-full object-cover rounded-xl"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className="w-full h-full bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl flex items-center justify-center text-6xl" style={{display: product.image_url ? 'none' : 'flex'}}>
+                    🛍️
+                  </div>
                 </div>
                 
-                {product.discount && (
+                {product.discount_percentage && product.discount_percentage > 0 && (
                   <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-sm font-semibold">
-                    -{product.discount}%
+                    -{product.discount_percentage}%
                   </div>
                 )}
                 
@@ -237,8 +215,8 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
               {/* Product Info */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-primary-600 font-medium">{product.brand}</span>
-                  <span className="text-sm text-gray-500">{product.weight}</span>
+                  <span className="text-sm text-primary-600 font-medium">{product.brand || 'PawRanger'}</span>
+                  <span className="text-sm text-gray-500">{product.weight || 'N/A'}</span>
                 </div>
                 
                 <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors">
@@ -254,7 +232,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
                       <Star
                         key={i}
                         className={`w-4 h-4 ${
-                          i < Math.floor(product.rating)
+                          i < Math.floor(product.rating || 4.5)
                             ? 'text-yellow-400 fill-current'
                             : 'text-gray-300'
                         }`}
@@ -262,7 +240,7 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
                     ))}
                   </div>
                   <span className="text-sm text-gray-600">
-                    {product.rating} ({product.reviews} ulasan)
+                    {product.rating || 4.5} ({product.review_count || 0} ulasan)
                   </span>
                 </div>
                 
@@ -271,44 +249,147 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
                   <span className="text-2xl font-bold text-primary-600">
                     {formatPrice(product.price)}
                   </span>
-                  {product.originalPrice && (
+                  {product.original_price && product.original_price > product.price && (
                     <span className="text-lg text-gray-400 line-through">
-                      {formatPrice(product.originalPrice)}
+                      {formatPrice(product.original_price)}
                     </span>
                   )}
                 </div>
                 
                 {/* Stock Status */}
                 <div className={`text-sm font-medium ${
-                  product.inStock ? 'text-green-600' : 'text-red-600'
+                  product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {product.inStock ? '✅ Tersedia' : '❌ Stok Habis'}
+                  {product.stock_quantity > 0 ? `✅ Tersedia (${product.stock_quantity})` : '❌ Stok Habis'}
                 </div>
                 
                 {/* Add to Cart Button */}
                 <button
                   onClick={() => addToCart(product)}
-                  disabled={!product.inStock}
+                  disabled={product.stock_quantity <= 0}
                   className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center space-x-2 ${
-                    product.inStock
+                    product.stock_quantity > 0
                       ? 'bg-primary-600 text-white hover:bg-primary-700 transform hover:scale-105'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
                 >
                   <ShoppingCart className="w-5 h-5" />
-                  <span>{product.inStock ? 'Tambah ke Keranjang' : 'Stok Habis'}</span>
+                  <span>{product.stock_quantity > 0 ? 'Tambah ke Keranjang' : 'Stok Habis'}</span>
                 </button>
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* No Products Found */}
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Produk Tidak Ditemukan</h3>
-            <p className="text-gray-600">Coba ubah kata kunci pencarian atau kategori produk.</p>
+        {!loading && !error && filteredProducts.length === 0 && (
+          <div className="text-center py-20">
+            <div className="max-w-md mx-auto">
+              {/* Enhanced Visual */}
+              <div className="relative mb-8">
+                <div className="w-32 h-32 mx-auto bg-gradient-to-br from-primary-100 to-secondary-100 rounded-full flex items-center justify-center mb-4">
+                  <div className="text-6xl">🐾</div>
+                </div>
+                <div className="absolute -top-2 -right-2 w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <div className="text-2xl">🔍</div>
+                </div>
+              </div>
+              
+              {/* Dynamic Messaging */}
+              {searchTerm || selectedCategory !== 'all' ? (
+                <>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Tidak Ada Hasil Ditemukan</h3>
+                  <p className="text-gray-600 mb-6">
+                    Kami tidak menemukan produk yang cocok dengan pencarian 
+                    {searchTerm && <span className="font-semibold text-primary-600">\"{searchTerm}\"</span>}
+                    {searchTerm && selectedCategory !== 'all' && ' di kategori '}
+                    {selectedCategory !== 'all' && <span className="font-semibold text-primary-600">{categories.find(c => c.id === selectedCategory)?.name}</span>}
+                  </p>
+                  
+                  {/* Actionable Suggestions */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => {
+                          setSearchTerm('');
+                          setSelectedCategory('all');
+                        }}
+                        className="bg-primary-600 text-white px-6 py-3 rounded-full hover:bg-primary-700 transition-all duration-300 font-semibold transform hover:scale-105"
+                      >
+                        🔄 Reset Pencarian
+                      </button>
+                      <button
+                        onClick={() => setSelectedCategory('all')}
+                        className="bg-white text-primary-600 border-2 border-primary-600 px-6 py-3 rounded-full hover:bg-primary-50 transition-all duration-300 font-semibold"
+                      >
+                        📋 Lihat Semua Kategori
+                      </button>
+                    </div>
+                    
+                    {/* Popular Categories Suggestion */}
+                    <div className="mt-8">
+                      <p className="text-sm text-gray-500 mb-4">Atau coba kategori populer:</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {categories.slice(1, 4).map((category) => (
+                          <button
+                            key={category.id}
+                            onClick={() => {
+                              setSelectedCategory(category.id);
+                              setSearchTerm('');
+                            }}
+                            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-full hover:bg-primary-100 hover:text-primary-700 transition-all duration-300 text-sm font-medium"
+                          >
+                            {category.icon} {category.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Belum Ada Produk</h3>
+                  <p className="text-gray-600 mb-6">
+                    Toko kami sedang mempersiapkan produk-produk terbaik untuk hewan peliharaan Anda.
+                    Silakan kembali lagi nanti atau hubungi kami untuk informasi lebih lanjut.
+                  </p>
+                  
+                  {/* Contact Actions */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="bg-primary-600 text-white px-6 py-3 rounded-full hover:bg-primary-700 transition-all duration-300 font-semibold transform hover:scale-105"
+                      >
+                        🔄 Muat Ulang
+                      </button>
+                      <button
+                        className="bg-white text-primary-600 border-2 border-primary-600 px-6 py-3 rounded-full hover:bg-primary-50 transition-all duration-300 font-semibold"
+                      >
+                        📞 Hubungi Kami
+                      </button>
+                    </div>
+                    
+                    {/* Newsletter Signup */}
+                    <div className="mt-8 p-6 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl">
+                      <h4 className="font-semibold text-gray-900 mb-2">Dapatkan Notifikasi Produk Baru</h4>
+                      <p className="text-sm text-gray-600 mb-4">Jadilah yang pertama tahu saat produk baru tersedia!</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          placeholder="Email Anda"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <button className="bg-primary-600 text-white px-6 py-2 rounded-full hover:bg-primary-700 transition-colors font-medium">
+                          Daftar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -334,4 +415,4 @@ const Shop = ({ cartItems, addToCart, onOpenCart, onNavigateToEcommerce }) => {
   );
 };
 
-export default Shop;
+export default memo(Shop);

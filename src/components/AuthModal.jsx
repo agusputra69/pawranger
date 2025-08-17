@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Eye, EyeOff, User, Mail, Lock, Phone } from 'lucide-react';
+import { signUp, signIn } from '../lib/supabase';
 
 const AuthModal = ({ isOpen, onClose, onLogin }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -35,34 +36,34 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
     // Email validation
     if (!formData.email) {
-      newErrors.email = 'Email wajib diisi';
+      newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Format email tidak valid';
+      newErrors.email = 'Please enter a valid email';
     }
 
     // Password validation
     if (!formData.password) {
-      newErrors.password = 'Password wajib diisi';
+      newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password minimal 6 karakter';
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
     // Registration-specific validations
     if (!isLoginMode) {
       if (!formData.name) {
-        newErrors.name = 'Nama wajib diisi';
+        newErrors.name = 'Name is required';
       }
 
       if (!formData.phone) {
-        newErrors.phone = 'Nomor telepon wajib diisi';
+        newErrors.phone = 'Phone number is required';
       } else if (!/^08\d{8,11}$/.test(formData.phone)) {
-        newErrors.phone = 'Format nomor telepon tidak valid';
+        newErrors.phone = 'Please enter a valid phone number';
       }
 
       if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Konfirmasi password wajib diisi';
+        newErrors.confirmPassword = 'Please confirm your password';
       } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Password tidak cocok';
+        newErrors.confirmPassword = 'Passwords do not match';
       }
     }
 
@@ -78,20 +79,34 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      let result;
       
-      // Mock user data
+      if (isLoginMode) {
+        // Login with Supabase
+        result = await signIn(formData.email, formData.password);
+      } else {
+        // Register with Supabase
+        const userData = {
+          name: formData.name,
+          phone: formData.phone
+        };
+        result = await signUp(formData.email, formData.password, userData);
+      }
+
+      if (result.error) {
+        setErrors({ general: result.error.message });
+        return;
+      }
+
+      // Success - user data is in result.data.user
+      const user = result.data.user;
       const userData = {
-        id: Date.now(),
-        name: formData.name || formData.email.split('@')[0],
-        email: formData.email,
-        phone: formData.phone || '',
+        id: user.id,
+        name: user.user_metadata?.name || user.email.split('@')[0],
+        email: user.email,
+        phone: user.user_metadata?.phone || '',
         isLoggedIn: true
       };
-
-      // Store user data in localStorage
-      localStorage.setItem('pawranger_user', JSON.stringify(userData));
       
       // Call parent login handler
       onLogin(userData);
@@ -99,8 +114,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       // Close modal
       onClose();
       resetForm();
-    } catch (error) {
-      setErrors({ general: 'Terjadi kesalahan. Silakan coba lagi.' });
+    } catch {
+      setErrors({ general: 'An error occurred. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +137,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-2xl font-bold text-gray-900">
-            {isLoginMode ? 'Masuk' : 'Daftar'}
+            {isLoginMode ? 'Login' : 'Register'}
           </h2>
           <button
             onClick={onClose}
@@ -144,7 +159,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Masuk
+              Login
             </button>
             <button
               onClick={() => handleModeSwitch(false)}
@@ -154,7 +169,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Daftar
+              Register
             </button>
           </div>
 
@@ -165,7 +180,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <User className="w-4 h-4 inline mr-2" />
-                  Nama Lengkap
+                  Full Name
                 </label>
                 <input
                   type="text"
@@ -174,7 +189,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
                     errors.name ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  placeholder="Masukkan nama lengkap"
+                  placeholder="Enter your full name"
                 />
                 {errors.name && (
                   <p className="text-red-500 text-sm mt-1">{errors.name}</p>
@@ -195,7 +210,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
                   errors.email ? 'border-red-300' : 'border-gray-300'
                 }`}
-                placeholder="email@example.com"
+                placeholder="Enter your email"
               />
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -207,7 +222,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Phone className="w-4 h-4 inline mr-2" />
-                  Nomor Telepon
+                  Phone Number
                 </label>
                 <input
                   type="tel"
@@ -216,7 +231,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
                     errors.phone ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  placeholder="08xxxxxxxxxx"
+                  placeholder="Enter your phone number"
                 />
                 {errors.phone && (
                   <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -238,7 +253,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
                     errors.password ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  placeholder="Masukkan password"
+                  placeholder="Enter your password"
                 />
                 <button
                   type="button"
@@ -258,7 +273,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Lock className="w-4 h-4 inline mr-2" />
-                  Konfirmasi Password
+                  Confirm Password
                 </label>
                 <input
                   type="password"
@@ -267,7 +282,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
                     errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  placeholder="Ulangi password"
+                  placeholder="Confirm your password"
                 />
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
@@ -291,10 +306,10 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  {isLoginMode ? 'Masuk...' : 'Mendaftar...'}
+                  {isLoginMode ? 'Logging in...' : 'Registering...'}
                 </>
               ) : (
-                isLoginMode ? 'Masuk' : 'Daftar'
+                isLoginMode ? 'Login' : 'Register'
               )}
             </button>
           </form>
@@ -302,12 +317,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
           {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
-              {isLoginMode ? 'Belum punya akun?' : 'Sudah punya akun?'}
+              {isLoginMode ? "Don't have an account?" : 'Already have an account?'}
               <button
                 onClick={() => handleModeSwitch(!isLoginMode)}
                 className="text-primary-600 hover:text-primary-700 font-medium ml-1"
               >
-                {isLoginMode ? 'Daftar sekarang' : 'Masuk di sini'}
+                {isLoginMode ? 'Register now' : 'Login here'}
               </button>
             </p>
           </div>

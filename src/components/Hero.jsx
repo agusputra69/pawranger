@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { ArrowRight, Star, Users, Award, Heart } from 'lucide-react';
 
 const Hero = ({ onNavigateToBooking }) => {
@@ -140,4 +141,4 @@ const Hero = ({ onNavigateToBooking }) => {
   );
 };
 
-export default Hero;
+export default memo(Hero);

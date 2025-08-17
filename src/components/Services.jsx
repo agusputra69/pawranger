@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { Scissors, ShoppingBag, Stethoscope, Home, Car, Heart } from 'lucide-react';
 
 const Services = ({ onNavigateToBooking }) => {
@@ -155,4 +156,4 @@ const Services = ({ onNavigateToBooking }) => {
   );
 };
 
-export default Services;
+export default memo(Services);

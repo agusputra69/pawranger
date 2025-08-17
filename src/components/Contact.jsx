@@ -13,19 +13,107 @@ const Contact = () => {
     message: ''
   });
 
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateField = (name, value) => {
+    const errors = {};
+    
+    switch (name) {
+      case 'name':
+        if (!value.trim()) {
+          errors.name = 'Nama lengkap wajib diisi';
+        } else if (value.trim().length < 2) {
+          errors.name = 'Nama harus minimal 2 karakter';
+        }
+        break;
+      case 'email':
+        if (!value.trim()) {
+          errors.email = 'Email wajib diisi';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors.email = 'Format email tidak valid';
+        }
+        break;
+      case 'phone':
+        if (!value.trim()) {
+          errors.phone = 'Nomor telepon wajib diisi';
+        } else if (!/^[+]?[0-9\s-()]{10,}$/.test(value)) {
+          errors.phone = 'Format nomor telepon tidak valid';
+        }
+        break;
+      case 'service':
+        if (!value) {
+          errors.service = 'Pilih layanan yang diinginkan';
+        }
+        break;
+    }
+    
+    return errors;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+    // Clear existing error for this field
+    if (validationErrors[name]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+
+    // Validate field on change
+    const fieldErrors = validateField(name, value);
+    if (Object.keys(fieldErrors).length > 0) {
+      setValidationErrors(prev => ({ ...prev, ...fieldErrors }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    // Validate required fields
+    const nameErrors = validateField('name', formData.name);
+    const emailErrors = validateField('email', formData.email);
+    const phoneErrors = validateField('phone', formData.phone);
+    const serviceErrors = validateField('service', formData.service);
+    
+    Object.assign(errors, nameErrors, emailErrors, phoneErrors, serviceErrors);
+    
+    return errors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate all fields
+    const errors = validateForm();
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
     // Handle form submission here
     console.log('Form submitted:', formData);
     alert('Terima kasih! Kami akan menghubungi Anda segera.');
+    
+    // Reset form and errors
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      petName: '',
+      petType: '',
+      service: '',
+      date: '',
+      message: ''
+    });
+    setValidationErrors({});
   };
 
   const contactInfo = [
@@ -174,10 +262,15 @@ const Contact = () => {
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                        validationErrors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="Masukkan nama Anda"
                     />
                   </div>
+                  {validationErrors.name && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -191,10 +284,15 @@ const Contact = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                        validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="email@example.com"
                     />
                   </div>
+                  {validationErrors.email && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+                  )}
                 </div>
               </div>
 
@@ -210,10 +308,15 @@ const Contact = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      validationErrors.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="+62 812-3456-7890"
                   />
                 </div>
+                {validationErrors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
+                )}
               </div>
 
               {/* Pet Information */}
@@ -246,6 +349,9 @@ const Contact = () => {
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
+                  {validationErrors.service && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.service}</p>
+                  )}
                 </div>
               </div>
 
@@ -260,7 +366,9 @@ const Contact = () => {
                     value={formData.service}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      validationErrors.service ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   >
                     <option value="">Pilih layanan</option>
                     {services.map((service) => (
