@@ -87,26 +87,6 @@ const EcommercePage = ({ onNavigateHome, onOpenCart, cartItems, addToCart }) => 
     }
   }, []);
 
-  // Retry function with exponential backoff (commented out as unused)
-  // const retryFetchProducts = async () => {
-  //   if (retryCount >= 3) return;
-  //   
-  //   setRetryCount(prev => prev + 1);
-  //   const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
-  //   
-  //   setTimeout(() => {
-  //     const filters = {
-  //       category: selectedCategory !== 'all' ? selectedCategory : null,
-  //       search: searchTerm || null,
-  //       minPrice: priceRange[0] > 0 ? priceRange[0] : null,
-  //       maxPrice: priceRange[1] < 1000000 ? priceRange[1] : null,
-  //       brands: selectedBrands.length > 0 ? selectedBrands : null,
-  //       sortBy: sortBy
-  //     };
-  //     fetchProducts(filters, true);
-  //   }, delay);
-  // };
-
   // Initial load
   useEffect(() => {
     fetchProducts();

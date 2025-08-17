@@ -201,11 +201,11 @@ const ProductFilters = memo(({
   // Mobile overlay and desktop container
   const containerClasses = isMobile
     ? `fixed inset-0 z-50 ${isOpen ? 'block' : 'hidden'}`
-    : 'lg:w-1/4';
+    : 'w-full';
 
   const contentClasses = isMobile
-    ? 'fixed inset-y-0 right-0 w-full max-w-sm bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto'
-    : 'bg-white rounded-2xl shadow-sm sticky top-8';
+    ? 'fixed inset-y-0 right-0 w-full bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto'
+    : 'bg-white rounded-2xl shadow-sm sticky top-8 w-full h-full';
 
   return (
     <>
@@ -267,7 +267,7 @@ const ProductFilters = memo(({
                 <input
                   id="product-search"
                   type="text"
-                  placeholder="Search for products..."
+                  placeholder="Search products"
                   value={searchDebounce}
                   onChange={(e) => setSearchDebounce(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 text-base touch-manipulation"
