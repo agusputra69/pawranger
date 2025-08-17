@@ -25,13 +25,7 @@ function BookingPageRoute() {
     navigate('/');
   };
 
-  const handleCheckout = () => {
-    if (!user) {
-      handleOpenAuth();
-      return;
-    }
-    navigate('/checkout');
-  };
+
 
   return (
     <>

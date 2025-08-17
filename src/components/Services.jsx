@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { memo } from 'react';
 import { Clock, MapPin, Phone, Star, Calendar, Users, Heart, Shield, Scissors, ShoppingBag, Stethoscope, HomeIcon, Car } from 'lucide-react';
 import { SERVICE_PRICING } from '../constants';
 

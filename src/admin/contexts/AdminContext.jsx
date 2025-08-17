@@ -160,7 +160,13 @@ export const AdminProvider = ({ children }) => {
       dispatch({ type: 'LOGOUT' });
     } catch (error) {
       console.error('Logout error:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      // Even if logout fails on server, clear local state
+      // This handles network failures gracefully
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      dispatch({ type: 'LOGOUT' });
+      // Don't set error state for network failures during logout
+      // as the user should still be logged out locally
     }
   };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../contexts/AdminContext';
 import { 
   Menu, 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 const AdminHeader = ({ onMenuClick, admin, className = '' }) => {
+  const navigate = useNavigate();
   const { logout } = useAdmin();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -35,8 +37,7 @@ const AdminHeader = ({ onMenuClick, admin, className = '' }) => {
   };
 
   const handleBackToSite = () => {
-    // In a full implementation, this would navigate back to the main site
-    console.log('Navigate back to main site');
+    navigate('/');
   };
 
   return (

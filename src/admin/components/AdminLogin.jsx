@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../contexts/AdminContext';
 import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
 
 const AdminLogin = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -22,10 +24,10 @@ const AdminLogin = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      // This will be handled by the routing logic
-      console.log('Admin authenticated, should redirect to dashboard');
+      console.log('Admin authenticated, redirecting to dashboard');
+      navigate('/admin/dashboard');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -48,8 +50,8 @@ const AdminLogin = () => {
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
-        // Login successful - routing will handle redirect
-        console.log('Login successful');
+        console.log('Login successful, redirecting to admin dashboard');
+        navigate('/admin/dashboard');
       }
     } catch (err) {
       console.error('Login submission error:', err);

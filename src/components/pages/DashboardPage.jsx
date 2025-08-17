@@ -21,8 +21,18 @@ function DashboardPageRoute() {
   const handleCloseAuth = () => setIsAuthModalOpen(false);
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails on server, clear local state and redirect
+      // This handles network failures gracefully
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      navigate('/');
+      // Optionally show a toast notification about the logout issue
+    }
   };
 
   const handleNavigateToShop = () => {

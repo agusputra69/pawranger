@@ -123,7 +123,13 @@ export const useAuth = () => {
       return result;
     } catch (error) {
       console.error('Sign out error:', error);
-      return { success: false, error: error.message };
+      // Even if server logout fails, clear local state
+      // This handles network failures gracefully
+      storage.remove('user');
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      setUser(null);
+      return { success: true }; // Return success since local logout completed
     }
   }, [executeAsync]);
 

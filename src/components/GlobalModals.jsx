@@ -26,8 +26,17 @@ function GlobalModals({
   } = useCartContext()
 
   const handleLogin = async (userData) => {
-    await signIn(userData)
-    onCloseAuth()
+    try {
+      await signIn(userData)
+      onCloseAuth()
+      // Redirect to dashboard after successful login
+      if (onNavigate) {
+        onNavigate('dashboard')
+      }
+    } catch (error) {
+      console.error('Login failed:', error)
+      // Error handling is managed by AuthModal component
+    }
   }
 
   const handleCheckout = () => {

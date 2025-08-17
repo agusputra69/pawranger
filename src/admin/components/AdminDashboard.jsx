@@ -17,7 +17,7 @@ const AdminDashboard = ({ children, currentView = 'overview', onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 lg:flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
@@ -28,7 +28,7 @@ const AdminDashboard = ({ children, currentView = 'overview', onNavigate }) => {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <AdminSidebar 
@@ -40,12 +40,11 @@ const AdminDashboard = ({ children, currentView = 'overview', onNavigate }) => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="flex-1 lg:flex lg:flex-col">
         {/* Header */}
         <AdminHeader 
           onMenuClick={toggleSidebar}
           admin={admin}
-          className="sticky top-0 z-30"
         />
 
         {/* Page content */}

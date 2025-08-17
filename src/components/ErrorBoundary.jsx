@@ -9,7 +9,7 @@ class ErrorBoundary extends React.Component {
 
   static getDerivedStateFromError(error) {
     // Update state so the next render will show the fallback UI
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -49,6 +49,7 @@ class ErrorBoundary extends React.Component {
               </p>
             </div>
 
+            {/* eslint-disable-next-line no-undef */}
             {process.env.NODE_ENV === 'development' && (
               <div className="mb-6 p-4 bg-red-50 rounded-lg text-left">
                 <h3 className="text-sm font-semibold text-red-800 mb-2">Error Details (Development):</h3>
@@ -93,37 +94,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Higher-order component for wrapping components with error boundary
-export const withErrorBoundary = (Component, fallback) => {
-  return function WrappedComponent(props) {
-    return (
-      <ErrorBoundary fallback={fallback}>
-        <Component {...props} />
-      </ErrorBoundary>
-    );
-  };
-};
 
-// Hook for error handling in functional components
-export const useErrorHandler = () => {
-  const [error, setError] = React.useState(null);
-
-  const resetError = React.useCallback(() => {
-    setError(null);
-  }, []);
-
-  const handleError = React.useCallback((error) => {
-    console.error('Error caught by useErrorHandler:', error);
-    setError(error);
-  }, []);
-
-  React.useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-
-  return { handleError, resetError };
-};
 
 export default ErrorBoundary;

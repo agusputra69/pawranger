@@ -21,8 +21,18 @@ function HomePageRoute() {
   const handleCloseAuth = () => setIsAuthModalOpen(false);
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails on server, clear local state and redirect
+      // This handles network failures gracefully
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      navigate('/');
+      // Optionally show a toast notification about the logout issue
+    }
   };
 
   const handleNavigateToShop = () => {
@@ -47,6 +57,23 @@ function HomePageRoute() {
       return;
     }
     navigate('/checkout');
+  };
+
+  const handleNavigate = (destination) => {
+    switch (destination) {
+      case 'dashboard':
+        navigate('/dashboard');
+        break;
+      case 'checkout':
+        handleCheckout();
+        break;
+      case 'ecommerce':
+      case 'shop':
+        navigate('/shop');
+        break;
+      default:
+        navigate('/');
+    }
   };
 
   return (
@@ -76,6 +103,7 @@ function HomePageRoute() {
         onCloseCart={handleCloseCart}
         isAuthModalOpen={isAuthModalOpen}
         onCloseAuth={handleCloseAuth}
+        onNavigate={handleNavigate}
       />
     </>
   );

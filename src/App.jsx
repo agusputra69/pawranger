@@ -21,6 +21,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { FullPageLoader } from './components/LoadingBoundary';
 import GlobalModals from './components/GlobalModals';
 import LoadingScreen from './components/LoadingScreen';
+import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedAdminRoute from './admin/components/ProtectedAdminRoute';
 import AdminRouter from './admin/components/AdminRouter';
 import {
@@ -118,9 +119,11 @@ function AppContent() {
             </Suspense>
           } />
           <Route path="/dashboard" element={
-            <Suspense fallback={<LoadingScreen message="Loading Dashboard..." />}>
-              <LazyUserDashboard />
-            </Suspense>
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingScreen message="Loading Dashboard..." />}>
+                <LazyUserDashboard />
+              </Suspense>
+            </ProtectedRoute>
           } />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={

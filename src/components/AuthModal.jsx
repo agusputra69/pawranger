@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { X, Eye, EyeOff, User, Mail, Lock, Phone } from 'lucide-react';
-import { signUp, signIn } from '../lib/supabase';
+import { useAuthContext } from '../contexts/AuthContext';
 
 const AuthModal = ({ isOpen, onClose, onLogin }) => {
+  const { signIn, signUp } = useAuthContext();
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -82,10 +83,10 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       let result;
       
       if (isLoginMode) {
-        // Login with Supabase
+        // Login with useAuth hook
         result = await signIn(formData.email, formData.password);
       } else {
-        // Register with Supabase
+        // Register with useAuth hook
         const userData = {
           name: formData.name,
           phone: formData.phone

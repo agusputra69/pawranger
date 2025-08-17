@@ -1,8 +1,7 @@
 import React, { useState, useEffect, memo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { smoothScrollTo } from '../utils';
-import { useAuthContext } from '../contexts/AuthContext';
 import { useCartContext } from '../contexts/CartContext';
 import TopBar from './TopBar';
 import DesktopNav from './DesktopNav';
@@ -16,7 +15,6 @@ const Header = ({
   onLogout
 }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { cartItems, openCart, isLoading: isCartLoading, error: cartError } = useCartContext();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
